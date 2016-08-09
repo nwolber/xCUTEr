@@ -7,6 +7,8 @@ package flow
 import (
 	"log"
 	"sync"
+
+	"golang.org/x/net/context"
 )
 
 // ParallelTask executes its children in parallel.
@@ -17,7 +19,8 @@ type ParallelTask struct {
 
 	n      int
 	active bool
-	lock   sync.Mutex
+	context.Context
+	lock sync.Mutex
 }
 
 // Parallel returns a new task that executes its children in parallel.
@@ -36,13 +39,15 @@ func Parallel(children ...Task) *ParallelTask {
 }
 
 // Activate starts parallel execution of all children.
-func (c *ParallelTask) Activate() Waiter {
+func (c *ParallelTask) Activate(ctx context.Context) Waiter {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if c.active {
 		return c
 	}
+
+	c.Context = ctx
 
 	c.activate.Complete(nil)
 
@@ -98,7 +103,7 @@ func (c *ParallelTask) watchChild(child Task) {
 	)
 
 	c.activate.Wait()
-	child.Activate()
+	child.Activate(c.Context)
 
 	for ok = true; ok && err == nil; {
 		ok, err = child.Wait()

@@ -7,6 +7,8 @@ package flow
 import (
 	"errors"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func TestRun(t *testing.T) {
@@ -18,11 +20,35 @@ func TestRun(t *testing.T) {
 func TestActivate(t *testing.T) {
 	run := make(chan struct{})
 
-	c := Run(func(c Completion) {
+	ctx := context.Background()
+	c := RunWithContext(func(c ContextCompletion) {
+		if c.(*activateCompleter).Context != ctx {
+			t.Errorf("Expected %#v, got: %#v", ctx, c.(context.Context))
+		}
 		close(run)
 	})
 
-	c.Activate()
+	c.Activate(ctx)
+	c.Wait()
+
+	select {
+	case <-run:
+	default:
+		t.Fatal("expected the worker to be run")
+	}
+}
+
+func TestActivateNil(t *testing.T) {
+	run := make(chan struct{})
+
+	c := RunWithContext(func(c ContextCompletion) {
+		if c.(*activateCompleter).Context != nil {
+			t.Errorf("Expected %#v, got: %#v", nil, c)
+		}
+		close(run)
+	})
+
+	c.Activate(nil)
 	c.Wait()
 
 	select {
@@ -37,7 +63,7 @@ func TestComplete(t *testing.T) {
 		c.Complete(nil)
 	})
 
-	c.Activate()
+	c.Activate(nil)
 	_, err := c.Wait()
 	if err != nil {
 		t.Fatal("expected no error, got:", err)
@@ -49,7 +75,7 @@ func TestCompleteWithError(t *testing.T) {
 		c.Complete(errors.New("test error"))
 	})
 
-	c.Activate()
+	c.Activate(nil)
 	_, err := c.Wait()
 	if err == nil {
 		t.Fatal("expected an error")

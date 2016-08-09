@@ -7,6 +7,8 @@ package flow
 import (
 	"log"
 	"sync"
+
+	"golang.org/x/net/context"
 )
 
 // SequentialTask implements sequential execution of children
@@ -34,7 +36,7 @@ func (c *SequentialTask) Wait() (bool, error) {
 }
 
 // Activate starts execution of the children.
-func (c *SequentialTask) Activate() Waiter {
+func (c *SequentialTask) Activate(ctx context.Context) Waiter {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -46,7 +48,7 @@ func (c *SequentialTask) Activate() Waiter {
 
 	go func() {
 		for _, child := range c.children {
-			child.Activate()
+			child.Activate(ctx)
 			if _, err := child.Wait(); err != nil {
 				c.parent.Complete(err)
 				return

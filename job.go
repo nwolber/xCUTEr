@@ -123,7 +123,7 @@ type job struct {
 }
 
 func prepareHost(ctx context.Context, output io.Writer, c *config, host *host) (j *job, err error) {
-	if c.Commands == nil || len(c.Commands) == 0 {
+	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
 
@@ -148,12 +148,9 @@ func prepareHost(ctx context.Context, output io.Writer, c *config, host *host) (
 		}(j)
 	}
 
-	exec := flow.Sequential()
-	for _, cmd := range c.Commands {
-		exec.Add(j.prepareCommand(cmd))
-	}
+	cmd := j.prepareCommand(c.Command)
 
-	j.exec = flow.Sequential(initiate, setup, exec)
+	j.exec = flow.Sequential(initiate, setup, cmd)
 
 	return
 }
@@ -187,55 +184,90 @@ func (j *job) Wait() (bool, error) {
 	return j.exec.Wait()
 }
 
-func (j *job) prepareCommand(cmd command) flow.Task {
+func (j *job) prepareCommand(cmd *command) (flow.Task, error) {
+	const (
+		sequential = "sequential"
+		parallel   = "parallel"
+		stdout     = "stdout"
+		stderr     = "stderr"
+	)
+
 	l, ctx := j._l, j._ctx
 
-	if cmd.Stdout != "" || cmd.Stderr != "" {
-		var (
-			stdout, stderr *os.File
-			err            error
-		)
+	if cmd.Command != "" && cmd.Commands != nil && len(cmd.Commands) > 0 {
+		err := fmt.Errorf("either command or commands can be present in %s", cmd)
+		l.Println(err)
+		return nil, err
+	}
 
+	var (
+		cmds           flow.GroupTask
+		stdout, stderr flow.Task
+		err            error
+	)
+
+	switch cmd.Flow {
+	case sequential:
+		cmds = flow.Sequential()
+	case parallel:
+		fallthrough
+	default:
+		cmds = flow.Parallel()
+	}
+
+	if cmd.Stdout != "" || cmd.Stderr != "" {
 		if cmd.Stdout != "" {
-			stdout, err = os.Create(cmd.Stdout)
-			if err != nil {
-				l.Println("unable to open stdout file:", err)
-				return nil
-			}
-			l.Println("opened", cmd.Stdout, "for stdout")
+			stdout = flow.RunWithContext(func(c flow.ContextCompletion) {
+				f, err := os.Create(cmd.Stdout)
+				if err != nil {
+					err = fmt.Errorf("unable to open stdout file: %s", err)
+					l.Println(err)
+					c.Complete(err)
+					return
+				}
+				l.Println("opened", cmd.Stdout, "for stdout")
+
+				go func(ctx context.Context, f io.Closer, path string) {
+					<-ctx.Done()
+					l.Println("closing stdout", path)
+					f.Close()
+				}(c, f, cmd.Stdout)
+			})
+
 		}
 
 		if cmd.Stderr == cmd.Stdout {
 			stderr = stdout
 		} else {
-			stderr, err = os.Create(cmd.Stderr)
-			if err != nil {
-				l.Println("unable to open stderr file:", err)
-				if stdout != nil {
-					stdout.Close()
+			stderr = flow.RunWithContext(func(c flow.ContextCompletion) {
+				f, err := os.Create(cmd.Stderr)
+				if err != nil {
+					err = fmt.Errorf("unable to open stdout file: %s", err)
+					l.Println(err)
+					c.Complete(err)
+					return
 				}
-				return nil
-			}
-			l.Println("opened", cmd.Stdout, "for stderr")
+				l.Println("opened", cmd.Stdout, "for stderr")
+
+				go func(ctx context.Context, f io.Closer, path string) {
+					<-ctx.Done()
+					l.Println("closing stderr", path)
+					f.Close()
+				}(c, f, cmd.Stdout)
+			})
 		}
-
-		return flow.Run(func(c flow.Completion) {
-			defer func() {
-				if stdout != nil {
-					if err := stdout.Close(); err != nil {
-						log.Println("error closing", cmd.Stdout, err)
-					}
-				}
-				if stderr != stdout && stderr != nil {
-					if err := stderr.Close(); err != nil {
-						log.Println("error closing", cmd.Stderr, err)
-					}
-				}
-			}()
-
-			j.s.executeCommand(ctx, cmd.Command, stdout, stderr)
-		})
 	}
 
-	return flow.Run(func(c flow.Completion) { j.s.executeCommand(ctx, cmd.Command, nil, nil) })
+	if cmd.Command != "" {
+		cmds.Add(flow.RunWithContext(func(c flow.ContextCompletion) {
+			stdout := c.Value("stdout")
+			j.s.executeCommand(ctx, cmd.Command, stdout, stderr)
+		}))
+	}
+
+	if cmd.Commands != nil && len(cmd.Commands) > 0 {
+
+	}
+
+	return exec, nil
 }

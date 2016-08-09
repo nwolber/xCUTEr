@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 )
 
@@ -16,7 +17,7 @@ type config struct {
 	Schedule   string      `json:"schedule,omitempty"`
 	Host       *host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
-	Commands   []command   `json:"commands,omitempty"`
+	Command    *command    `json:"commands,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
 	SCP        *scp        `json:"scp,omitempty"`
 }
@@ -45,9 +46,15 @@ type scp struct {
 }
 
 type command struct {
-	Command string `json:"command,omitempty"`
-	Stdout  string `json:"stdout,omitempty"`
-	Stderr  string `json:"stderr,omitempty"`
+	Command  string     `json:"command,omitempty"`
+	Commands []*command `json:"commands,omitempty`
+	Flow     string     `json:"command,omit"`
+	Stdout   string     `json:"stdout,omitempty"`
+	Stderr   string     `json:"stderr,omitempty"`
+}
+
+func (c *command) String() string {
+	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q")
 }
 
 func readConfig(file string) (*config, error) {
