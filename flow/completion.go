@@ -4,7 +4,11 @@
 
 package flow
 
-import "log"
+import (
+	"log"
+
+	"golang.org/x/net/context"
+)
 
 // Completer signals completion.
 type Completer interface {
@@ -20,6 +24,11 @@ type Waiter interface {
 type Completion interface {
 	Completer
 	Waiter
+}
+
+type ContextCompletion interface {
+	Completion
+	context.Context
 }
 
 // SimpleCompleter signals completion by closing the channel.

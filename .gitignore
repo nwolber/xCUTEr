@@ -1,6 +1,10 @@
-xCUTEr
+.DS_store
 *.txt
 *.html
 *.json
+*.log
+*.job
 id_rsa*
+test_key*
 password
+cmd/xCUTER/xCUTER
