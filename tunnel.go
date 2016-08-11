@@ -11,8 +11,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/nwolber/xCUTEr/flow"
-
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/context"
 )
@@ -22,10 +20,8 @@ import (
 // to localAddr and forward any payload exchanged.
 //
 // Allocated resources will be released, when the context completes.
-func forward(ctx context.Context, c flow.Completion, client *ssh.Client, remoteAddr string, localAddr string) {
-	defer c.Complete(nil)
-
-	l, ok := ctx.Value("logger").(*log.Logger)
+func forward(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -34,7 +30,6 @@ func forward(ctx context.Context, c flow.Completion, client *ssh.Client, remoteA
 	if err != nil {
 		err = fmt.Errorf("Unable to listen to %s on remote host %s: %s", remoteAddr, client.RemoteAddr(), err)
 		l.Println(err)
-		c.Complete(err)
 		return
 	}
 
@@ -71,7 +66,7 @@ func forward(ctx context.Context, c flow.Completion, client *ssh.Client, remoteA
 				}(remoteConn)
 
 			case <-ctx.Done():
-				l.Println("context done")
+				l.Println("closing tunnel")
 				return
 			}
 		}

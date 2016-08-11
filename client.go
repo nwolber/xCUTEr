@@ -20,7 +20,7 @@ type sshClient struct {
 }
 
 func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
-	l, ok := ctx.Value("logger").(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -63,7 +63,7 @@ func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 }
 
 func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) {
-	l, ok := ctx.Value("logger").(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -113,6 +113,6 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 	l.Printf("%q executed successfully", command)
 }
 
-func (s *sshClient) forward(ctx context.Context, c flow.Completion, remoteAddr, localAddr string) {
-	forward(ctx, c, s.c, remoteAddr, localAddr)
+func (s *sshClient) forward(ctx context.Context, remoteAddr, localAddr string) {
+	forward(ctx, s.c, remoteAddr, localAddr)
 }

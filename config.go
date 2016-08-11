@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 )
 
 type hostConfig map[string]*host
@@ -15,9 +16,10 @@ type hostConfig map[string]*host
 type config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
+	Timeout    string      `json:"timeout,omitempty"`
 	Host       *host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
-	Command    *command    `json:"commands,omitempty"`
+	Command    *command    `json:"command,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
 	SCP        *scp        `json:"scp,omitempty"`
 }
@@ -48,7 +50,7 @@ type scp struct {
 type command struct {
 	Command  string     `json:"command,omitempty"`
 	Commands []*command `json:"commands,omitempty`
-	Flow     string     `json:"command,omit"`
+	Flow     string     `json:"flow,omit"`
 	Stdout   string     `json:"stdout,omitempty"`
 	Stderr   string     `json:"stderr,omitempty"`
 }
@@ -70,4 +72,31 @@ func readConfig(file string) (*config, error) {
 	}
 
 	return &c, nil
+}
+
+func loadHostsFile(file *hostsFile) (*hostConfig, error) {
+	var hosts hostConfig
+
+	b, err := ioutil.ReadFile(file.File)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(b, &hosts); err != nil {
+		return nil, err
+	}
+
+	regex, err := regexp.Compile(file.Pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredHosts := make(hostConfig)
+	for k, v := range hosts {
+		if regex.MatchString(k) {
+			filteredHosts[k] = v
+		}
+	}
+
+	return &filteredHosts, nil
 }

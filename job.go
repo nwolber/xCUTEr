@@ -5,34 +5,101 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"regexp"
+	"time"
 
-	"github.com/nwolber/xCUTEr/flow"
+	"github.com/nwolber/xCUTEr/flunc"
 	"golang.org/x/net/context"
 )
 
-type jobList struct {
-	jobs []*job
-	exec *flow.ParallelTask
-}
+const (
+	sequentialFlow = "sequential"
+	parallelFlow   = "parallel"
 
-func prepare(ctx context.Context, output io.Writer, c *config) (flow.Task, error) {
-	exec := flow.Sequential()
-	jobs := &jobList{}
+	outputKey    = "output"
+	loggerKey    = "logger"
+	sshClientKey = "sshClient"
+)
 
-	if c.Host != nil {
-		j, err := prepareHost(ctx, output, c, c.Host)
+func prepare(c *config) (flunc.Flunc, error) {
+	var children []flunc.Flunc
+
+	if c.Host == nil && c.HostsFile == nil {
+		return nil, errors.New("either 'host' or 'hostsFile' must be present")
+	}
+
+	if c.Host != nil && c.HostsFile == nil {
+		return nil, errors.New("either 'host' or 'hostsFile' may be present")
+	}
+
+	logger := func(ctx context.Context) (context.Context, error) {
+		output, ok := ctx.Value(outputKey).(io.Writer)
+		if !ok {
+			err := fmt.Errorf("no %s available", outputKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		return context.WithValue(ctx, loggerKey, log.New(output, fmt.Sprintf("Job %s: ", c.Name), log.Flags())), nil
+	}
+	children = append(children, logger)
+
+	if c.Timeout != "" {
+		timeout, err := time.ParseDuration(c.Timeout)
 		if err != nil {
 			return nil, err
 		}
-		jobs.jobs = append(jobs.jobs, j)
+
+		f := func(ctx context.Context) (context.Context, error) {
+			l, ok := ctx.Value(loggerKey).(*log.Logger)
+			if !ok {
+				err := fmt.Errorf("no %s available", loggerKey)
+				log.Println(err)
+				return nil, err
+			}
+
+			ctx, _ = context.WithTimeout(ctx, timeout)
+			l.Println("set timeout to", timeout)
+			return ctx, nil
+		}
+		children = append(children, f)
+	}
+
+	if c.SCP != nil {
+		log.Println("%#v", c.SCP)
+		scp := func(ctx context.Context) (context.Context, error) {
+			l, ok := ctx.Value(loggerKey).(*log.Logger)
+			if !ok {
+				err := fmt.Errorf("no %s available", loggerKey)
+				log.Println(err)
+				return nil, err
+			}
+
+			scp := c.SCP
+			b, err := ioutil.ReadFile(scp.Key)
+			if err != nil {
+				l.Println("failed reading key file", err)
+				return nil, err
+			}
+
+			l.Println("setting up scp on", scp.Addr)
+			doSCP(ctx, b, scp.Addr)
+			return nil, nil
+		}
+		children = append(children, scp)
+	}
+
+	if c.Host != nil {
+		host, err := prepareHost(c, c.Host)
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, host)
 	}
 
 	if c.HostsFile != nil {
@@ -43,187 +110,123 @@ func prepare(ctx context.Context, output io.Writer, c *config) (flow.Task, error
 
 		log.Printf("filtered hosts: %#v", hosts)
 
+		var hostFluncs []flunc.Flunc
 		for _, host := range *hosts {
-			j, err := prepareHost(ctx, output, c, host)
+			host, err := prepareHost(c, host)
 			if err != nil {
 				return nil, err
 			}
-			jobs.jobs = append(jobs.jobs, j)
+			hostFluncs = append(hostFluncs, host)
 		}
+		children = append(children, hostFluncs...)
 	}
 
-	if scp := c.SCP; scp != nil {
-		b, err := ioutil.ReadFile(c.SCP.Key)
-		if err != nil {
-			log.Println("failed reading key file", err)
-			return nil, err
-		}
-
-		log.Println("setting up scp on", scp.Addr)
-		exec.Add(flow.Run(func(c flow.Completion) { doSCP(ctx, c, b, scp.Addr) }))
-	}
-	exec.Add(jobs)
-
-	return exec, nil
+	return flunc.Sequential(children...), nil
 }
 
-func (j *jobList) Activate() flow.Waiter {
-	j.exec = flow.Parallel()
-
-	for _, job := range j.jobs {
-		j.exec.Add(job)
-	}
-
-	j.exec.Activate()
-
-	return j.exec
-}
-
-func (j *jobList) Wait() (bool, error) {
-	return j.exec.Wait()
-}
-
-func loadHostsFile(file *hostsFile) (*hostConfig, error) {
-	var hosts hostConfig
-
-	b, err := ioutil.ReadFile(file.File)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(b, &hosts); err != nil {
-		return nil, err
-	}
-
-	regex, err := regexp.Compile(file.Pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	filteredHosts := make(hostConfig)
-	for k, v := range hosts {
-		if regex.MatchString(k) {
-			filteredHosts[k] = v
-		}
-	}
-
-	return &filteredHosts, nil
-}
-
-type job struct {
-	// do NOT dereference s in preparation phase, it will be set in initialization
-	s *sshClient
-
-	// the following fields are save to derefernce during preparation
-	_l          *log.Logger
-	_ctx        context.Context
-	_completion flow.Completion
-
-	exec flow.Task
-}
-
-func prepareHost(ctx context.Context, output io.Writer, c *config, host *host) (j *job, err error) {
+func prepareHost(c *config, host *host) (flunc.Flunc, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
 
-	j = &job{
-		_completion: flow.New(),
-		_l:          log.New(output, fmt.Sprintf("Job %s - %s: ", c.Name, host.Addr), log.Flags()),
-	}
-
-	j._ctx = context.WithValue(ctx, "logger", j._l)
-
-	initiate := j.prepareSSHClient(host.Addr, host.User)
-
-	l, ctx := j._l, j._ctx
-
-	setup := flow.Parallel()
-	if f := c.Forwarding; f != nil {
-		l.Println("setting up forwarding", f.RemoteAddr, "->", f.LocalAddr)
-
-		// capture j
-		func(jj *job) {
-			setup.Add(flow.Run(func(c flow.Completion) { jj.s.forward(ctx, c, f.RemoteAddr, f.LocalAddr) }))
-		}(j)
-	}
-
-	cmd := j.prepareCommand(c.Command)
-
-	j.exec = flow.Sequential(initiate, setup, cmd)
-
-	return
-}
-
-func (j *job) prepareSSHClient(host, user string) flow.Task {
-	return flow.Run(func(c flow.Completion) {
-		var err error
-		j.s, err = newSSHClient(j._ctx, host, user)
-		if err != nil {
-			j._l.Println("ssh client setup failed", err)
-			c.Complete(err)
-			return
+	var children []flunc.Flunc
+	logger := func(ctx context.Context) (context.Context, error) {
+		output, ok := ctx.Value(outputKey).(io.Writer)
+		if !ok {
+			err := fmt.Errorf("no %s available", outputKey)
+			log.Println(err)
+			return nil, err
 		}
-	})
-}
 
-func (j *job) Activate() flow.Waiter {
-	select {
-	case <-j._ctx.Done():
-		log.Println("won't execute because context is done")
-		return nil
-	default:
+		logger := log.New(output, fmt.Sprintf("Job %s - %s: ", c.Name, host.Addr), log.Flags())
+		logger.Println("logger created")
+		return context.WithValue(ctx, loggerKey, logger), nil
+	}
+	children = append(children, logger)
+
+	setupSSH := prepareSSHClient(host.Addr, host.User)
+	children = append(children, setupSSH)
+
+	if f := c.Forwarding; f != nil {
+		forwarding := func(ctx context.Context) (context.Context, error) {
+			l, ok := ctx.Value(loggerKey).(*log.Logger)
+			if !ok {
+				err := fmt.Errorf("no %s available", loggerKey)
+				log.Println(err)
+				return nil, err
+			}
+
+			s, ok := ctx.Value(sshClientKey).(*sshClient)
+			if !ok {
+				return nil, fmt.Errorf("no %s available", sshClientKey)
+			}
+
+			l.Println("setting up forwarding", f.RemoteAddr, "->", f.LocalAddr)
+			s.forward(ctx, f.RemoteAddr, f.LocalAddr)
+
+			return nil, nil
+		}
+		children = append(children, forwarding)
 	}
 
-	j._l.Println("starting execution")
+	cmd, err := prepareCommand(c.Command)
+	if err != nil {
+		return nil, err
+	}
+	children = append(children, cmd)
 
-	return j.exec.Activate()
+	return flunc.Sequential(children...), nil
 }
 
-func (j *job) Wait() (bool, error) {
-	return j.exec.Wait()
+func prepareSSHClient(host, user string) flunc.Flunc {
+	return func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		s, err := newSSHClient(ctx, host, user)
+		if err != nil {
+			l.Println("ssh client setup failed", err)
+			return nil, err
+		}
+
+		return context.WithValue(ctx, sshClientKey, s), nil
+	}
 }
 
-func (j *job) prepareCommand(cmd *command) (flow.Task, error) {
+func prepareCommand(cmd *command) (flunc.Flunc, error) {
 	const (
 		sequential = "sequential"
 		parallel   = "parallel"
-		stdout     = "stdout"
-		stderr     = "stderr"
+		stdoutKey  = "stdout"
+		stderrKey  = "stderr"
 	)
-
-	l, ctx := j._l, j._ctx
 
 	if cmd.Command != "" && cmd.Commands != nil && len(cmd.Commands) > 0 {
 		err := fmt.Errorf("either command or commands can be present in %s", cmd)
-		l.Println(err)
 		return nil, err
 	}
 
-	var (
-		cmds           flow.GroupTask
-		stdout, stderr flow.Task
-		err            error
-	)
-
-	switch cmd.Flow {
-	case sequential:
-		cmds = flow.Sequential()
-	case parallel:
-		fallthrough
-	default:
-		cmds = flow.Parallel()
-	}
+	var stdout, stderr flunc.Flunc
 
 	if cmd.Stdout != "" || cmd.Stderr != "" {
 		if cmd.Stdout != "" {
-			stdout = flow.RunWithContext(func(c flow.ContextCompletion) {
+			stdout = func(ctx context.Context) (context.Context, error) {
+				l, ok := ctx.Value(loggerKey).(*log.Logger)
+				if !ok {
+					err := fmt.Errorf("no %s available", loggerKey)
+					log.Println(err)
+					return nil, err
+				}
+
 				f, err := os.Create(cmd.Stdout)
 				if err != nil {
 					err = fmt.Errorf("unable to open stdout file: %s", err)
 					l.Println(err)
-					c.Complete(err)
-					return
+					return nil, err
 				}
 				l.Println("opened", cmd.Stdout, "for stdout")
 
@@ -231,21 +234,28 @@ func (j *job) prepareCommand(cmd *command) (flow.Task, error) {
 					<-ctx.Done()
 					l.Println("closing stdout", path)
 					f.Close()
-				}(c, f, cmd.Stdout)
-			})
+				}(ctx, f, cmd.Stdout)
 
+				return context.WithValue(ctx, stdoutKey, f), nil
+			}
 		}
 
 		if cmd.Stderr == cmd.Stdout {
 			stderr = stdout
-		} else {
-			stderr = flow.RunWithContext(func(c flow.ContextCompletion) {
+		} else if cmd.Stderr != "" {
+			stderr = func(ctx context.Context) (context.Context, error) {
+				l, ok := ctx.Value(loggerKey).(*log.Logger)
+				if !ok {
+					err := fmt.Errorf("no %s available", loggerKey)
+					log.Println(err)
+					return nil, err
+				}
+
 				f, err := os.Create(cmd.Stderr)
 				if err != nil {
 					err = fmt.Errorf("unable to open stdout file: %s", err)
 					l.Println(err)
-					c.Complete(err)
-					return
+					return nil, err
 				}
 				l.Println("opened", cmd.Stdout, "for stderr")
 
@@ -253,21 +263,52 @@ func (j *job) prepareCommand(cmd *command) (flow.Task, error) {
 					<-ctx.Done()
 					l.Println("closing stderr", path)
 					f.Close()
-				}(c, f, cmd.Stdout)
-			})
+				}(ctx, f, cmd.Stderr)
+
+				return context.WithValue(ctx, stderrKey, f), nil
+			}
 		}
 	}
 
-	if cmd.Command != "" {
-		cmds.Add(flow.RunWithContext(func(c flow.ContextCompletion) {
-			stdout := c.Value("stdout")
-			j.s.executeCommand(ctx, cmd.Command, stdout, stderr)
-		}))
-	}
-
+	var childCommands []flunc.Flunc
 	if cmd.Commands != nil && len(cmd.Commands) > 0 {
+		for _, cmd := range cmd.Commands {
+			exec, err := prepareCommand(cmd)
+			if err != nil {
+				return nil, err
+			}
 
+			childCommands = append(childCommands, exec)
+		}
 	}
 
-	return exec, nil
+	var cmds flunc.Flunc
+
+	if cmd.Flow == sequentialFlow {
+		log.Println("Sequential")
+		cmds = flunc.Sequential(childCommands...)
+	} else {
+		log.Println("Parallel")
+		cmds = flunc.Parallel(childCommands...)
+	}
+
+	if cmd.Command != "" {
+		cmds = func(ctx context.Context) (context.Context, error) {
+			s, ok := ctx.Value(sshClientKey).(*sshClient)
+			if !ok {
+				return nil, fmt.Errorf("no %s available", sshClientKey)
+			}
+
+			stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+			stderr, _ := ctx.Value(stderrKey).(io.Writer)
+			s.executeCommand(ctx, cmd.Command, stdout, stderr)
+			return nil, nil
+		}
+	}
+
+	return flunc.Sequential(
+		stdout,
+		stderr,
+		cmds,
+	), nil
 }

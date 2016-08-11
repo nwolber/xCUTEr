@@ -37,21 +37,28 @@ func main() {
 
 	cron := scheduler.New()
 
+	start := time.Now()
+	f, err := prepare(conf)
+	stop := time.Now()
+	log.Println("job preparation took", stop.Sub(start))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	cron.AddFunc(conf.Schedule, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = context.WithValue(ctx, outputKey, os.Stdout)
 		defer cancel()
 
-		j, err := prepare(ctx, os.Stdout, conf)
+		start := time.Now()
+		_, err = f(ctx)
+		stop := time.Now()
 		if err != nil {
-			log.Fatalln(err)
+			log.Println("execution failed", err)
+		} else {
+			log.Println("execution complete")
 		}
-
-		j.Activate().Wait()
-		log.Println("execution complete")
-
-		if err != nil {
-			log.Println("error during job execution:", err)
-		}
+		log.Println("execution took", stop.Sub(start))
 	})
 	cron.Start()
 	defer cron.Stop()

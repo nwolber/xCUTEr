@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -34,6 +35,13 @@ func accept(ctx context.Context, l net.Listener) <-chan acceptMsg {
 
 	go func(ctx context.Context, l net.Listener) {
 		<-ctx.Done()
+		logger, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return
+		}
+		logger.Println("closing listener")
 		l.Close()
 	}(ctx, l)
 

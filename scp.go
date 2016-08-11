@@ -14,16 +14,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/nwolber/xCUTEr/flow"
-
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/context"
 )
 
-func doSCP(ctx context.Context, c flow.Completion, privateKey []byte, addr string) {
-	defer c.Complete(nil)
-
-	l, ok := ctx.Value("logger").(*log.Logger)
+func doSCP(ctx context.Context, privateKey []byte, addr string) error {
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -47,8 +43,7 @@ func doSCP(ctx context.Context, c flow.Completion, privateKey []byte, addr strin
 	if err != nil {
 		err = fmt.Errorf("failed to parse private key %s", err)
 		l.Println(err)
-		c.Complete(err)
-		return
+		return err
 	}
 
 	config.AddHostKey(private)
@@ -57,8 +52,7 @@ func doSCP(ctx context.Context, c flow.Completion, privateKey []byte, addr strin
 	if err != nil {
 		err = fmt.Errorf("failed to listen for connection %s", err)
 		l.Println(err)
-		c.Complete(err)
-		return
+		return err
 	}
 
 	go func() {
@@ -85,12 +79,13 @@ func doSCP(ctx context.Context, c flow.Completion, privateKey []byte, addr strin
 			}
 		}
 	}()
+	return nil
 }
 
 func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.ServerConfig) {
 	defer nConn.Close()
 
-	l, ok := ctx.Value("logger").(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -155,7 +150,7 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
 	defer channel.Close()
 
-	l, ok := ctx.Value("logger").(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
