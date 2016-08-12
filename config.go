@@ -32,14 +32,17 @@ type hostsFile struct {
 type host struct {
 	Name       string `json:"name,omitempty"`
 	Addr       string `json:"addr,omitempty"`
+	Port       uint   `json:"port,omitempty"`
 	User       string `json:"user,omitempty"`
 	PrivateKey string `json:"privateKey,omitempty"`
 	Password   string `json:"password,omitempty"`
 }
 
 type forwarding struct {
-	RemoteAddr string `json:"remoteAddr,omitempty"`
-	LocalAddr  string `json:"localAddr,omitempty"`
+	RemoteHost string `json:"remoteHost,omitempty"`
+	RemotePort uint16 `json:"remotePort,omitempty"`
+	LocalHost  string `json:"localHost,omitempty"`
+	LocalPort  uint16 `json:"localPort,omitempty"`
 }
 
 type scp struct {

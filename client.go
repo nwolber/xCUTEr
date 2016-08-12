@@ -62,7 +62,7 @@ func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 	}, nil
 }
 
-func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) {
+func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
@@ -71,7 +71,7 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 	select {
 	case <-ctx.Done():
 		l.Printf("won't execute %q because context is done", command)
-		return
+		return nil
 	default:
 	}
 
@@ -102,15 +102,16 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 	select {
 	case <-ctx.Done():
 		l.Println("closing session, context done")
-		return
+		return nil
 	case err, _ := <-done.Chan():
 		if err != nil {
 			l.Printf("executing %q failed: %s", command, err)
-			return
+			return err
 		}
 	}
 
 	l.Printf("%q executed successfully", command)
+	return nil
 }
 
 func (s *sshClient) forward(ctx context.Context, remoteAddr, localAddr string) {

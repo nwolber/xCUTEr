@@ -21,9 +21,10 @@ const (
 	sequentialFlow = "sequential"
 	parallelFlow   = "parallel"
 
-	outputKey    = "output"
-	loggerKey    = "logger"
-	sshClientKey = "sshClient"
+	outputKey     = "output"
+	loggerKey     = "logger"
+	sshClientKey  = "sshClient"
+	templatingKey = "templating"
 )
 
 func prepare(c *config) (flunc.Flunc, error) {
@@ -118,7 +119,7 @@ func prepare(c *config) (flunc.Flunc, error) {
 			}
 			hostFluncs = append(hostFluncs, host)
 		}
-		children = append(children, hostFluncs...)
+		children = append(children, flunc.Parallel(hostFluncs...))
 	}
 
 	return flunc.Sequential(children...), nil
@@ -138,13 +139,19 @@ func prepareHost(c *config, host *host) (flunc.Flunc, error) {
 			return nil, err
 		}
 
-		logger := log.New(output, fmt.Sprintf("Job %s - %s: ", c.Name, host.Addr), log.Flags())
+		logger := log.New(output, fmt.Sprintf("%s - %s:%d: ", c.Name, host.Addr, host.Port), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	}
 	children = append(children, logger)
 
-	setupSSH := prepareSSHClient(host.Addr, host.User)
+	templating := func(ctx context.Context) (context.Context, error) {
+		tt := newTemplatingEngine(c, host)
+		return context.WithValue(ctx, templatingKey, tt), nil
+	}
+	children = append(children, templating)
+
+	setupSSH := prepareSSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port), host.User)
 	children = append(children, setupSSH)
 
 	if f := c.Forwarding; f != nil {
@@ -161,8 +168,10 @@ func prepareHost(c *config, host *host) (flunc.Flunc, error) {
 				return nil, fmt.Errorf("no %s available", sshClientKey)
 			}
 
-			l.Println("setting up forwarding", f.RemoteAddr, "->", f.LocalAddr)
-			s.forward(ctx, f.RemoteAddr, f.LocalAddr)
+			remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
+			localAddr := fmt.Sprintf("%s:%d", f.LocalHost, f.LocalPort)
+			l.Println("setting up forwarding", remoteAddr, "->", localAddr)
+			s.forward(ctx, remoteAddr, localAddr)
 
 			return nil, nil
 		}
@@ -222,19 +231,32 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 					return nil, err
 				}
 
-				f, err := os.Create(cmd.Stdout)
+				tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+				if !ok {
+					err := fmt.Errorf("no %s available", templatingKey)
+					log.Println(err)
+					return nil, err
+				}
+
+				path, err := tt.Interpolate(cmd.Stdout)
+				if err != nil {
+					l.Println("error parsing template string", cmd.Stdout, err)
+					return nil, err
+				}
+
+				f, err := os.Create(path)
 				if err != nil {
 					err = fmt.Errorf("unable to open stdout file: %s", err)
 					l.Println(err)
 					return nil, err
 				}
-				l.Println("opened", cmd.Stdout, "for stdout")
+				l.Println("opened", path, "for stdout")
 
 				go func(ctx context.Context, f io.Closer, path string) {
 					<-ctx.Done()
 					l.Println("closing stdout", path)
 					f.Close()
-				}(ctx, f, cmd.Stdout)
+				}(ctx, f, path)
 
 				return context.WithValue(ctx, stdoutKey, f), nil
 			}
@@ -251,19 +273,32 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 					return nil, err
 				}
 
-				f, err := os.Create(cmd.Stderr)
+				tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+				if !ok {
+					err := fmt.Errorf("no %s available", templatingKey)
+					log.Println(err)
+					return nil, err
+				}
+
+				path, err := tt.Interpolate(cmd.Stderr)
+				if err != nil {
+					l.Println("error parsing template string", cmd.Stderr, err)
+					return nil, err
+				}
+
+				f, err := os.Create(path)
 				if err != nil {
 					err = fmt.Errorf("unable to open stdout file: %s", err)
 					l.Println(err)
 					return nil, err
 				}
-				l.Println("opened", cmd.Stdout, "for stderr")
+				l.Println("opened", path, "for stderr")
 
 				go func(ctx context.Context, f io.Closer, path string) {
 					<-ctx.Done()
 					l.Println("closing stderr", path)
 					f.Close()
-				}(ctx, f, cmd.Stderr)
+				}(ctx, f, path)
 
 				return context.WithValue(ctx, stderrKey, f), nil
 			}
@@ -294,15 +329,35 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 
 	if cmd.Command != "" {
 		cmds = func(ctx context.Context) (context.Context, error) {
+			l, ok := ctx.Value(loggerKey).(*log.Logger)
+			if !ok {
+				err := fmt.Errorf("no %s available", loggerKey)
+				log.Println(err)
+				return nil, err
+			}
+
 			s, ok := ctx.Value(sshClientKey).(*sshClient)
 			if !ok {
 				return nil, fmt.Errorf("no %s available", sshClientKey)
 			}
 
+			tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+			if !ok {
+				err := fmt.Errorf("no %s available", templatingKey)
+				log.Println(err)
+				return nil, err
+			}
+
+			command, err := tt.Interpolate(cmd.Command)
+			if err != nil {
+				l.Println("error parsing template string", cmd.Command, err)
+				return nil, err
+			}
+
 			stdout, _ := ctx.Value(stdoutKey).(io.Writer)
 			stderr, _ := ctx.Value(stderrKey).(io.Writer)
-			s.executeCommand(ctx, cmd.Command, stdout, stderr)
-			return nil, nil
+			err = s.executeCommand(ctx, command, stdout, stderr)
+			return nil, err
 		}
 	}
 
