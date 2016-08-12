@@ -45,7 +45,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	cron.AddFunc(conf.Schedule, func() {
+	exec := func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		ctx = context.WithValue(ctx, outputKey, os.Stdout)
 		defer cancel()
@@ -59,10 +59,15 @@ func main() {
 			log.Println("execution complete")
 		}
 		log.Println("execution took", stop.Sub(start))
-	})
-	cron.Start()
-	defer cron.Stop()
+	}
 
+	if conf.Schedule == "once" {
+		exec()
+	} else {
+		cron.AddFunc(conf.Schedule, exec)
+		cron.Start()
+		defer cron.Stop()
+	}
 	s := <-signals
 	fmt.Println("Got signal:", s)
 
