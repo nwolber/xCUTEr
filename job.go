@@ -27,8 +27,9 @@ const (
 	templatingKey = "templating"
 )
 
-func prepare(c *config) (flunc.Flunc, error) {
-	var children []flunc.Flunc
+func prepare(builder treeBuilder, c *config) (flunc.Flunc, error) {
+	// var children []flunc.Flunc
+	children := builder.Group()
 
 	if c.Host == nil && c.HostsFile == nil {
 		return nil, errors.New("either 'host' or 'hostsFile' must be present")
@@ -48,7 +49,8 @@ func prepare(c *config) (flunc.Flunc, error) {
 
 		return context.WithValue(ctx, loggerKey, log.New(output, fmt.Sprintf("Job %s: ", c.Name), log.Flags())), nil
 	}
-	children = append(children, logger)
+	// children = append(children, logger)
+	children.Append(logger)
 
 	if c.Timeout != "" {
 		timeout, err := time.ParseDuration(c.Timeout)
@@ -68,7 +70,8 @@ func prepare(c *config) (flunc.Flunc, error) {
 			l.Println("set timeout to", timeout)
 			return ctx, nil
 		}
-		children = append(children, f)
+		// children = append(children, f)
+		children.Append(f)
 	}
 
 	if c.SCP != nil {
@@ -92,15 +95,17 @@ func prepare(c *config) (flunc.Flunc, error) {
 			doSCP(ctx, b, scp.Addr)
 			return nil, nil
 		}
-		children = append(children, scp)
+		// children = append(children, scp)
+		children.Append(scp)
 	}
 
 	if c.Host != nil {
-		host, err := prepareHost(c, c.Host)
+		host, err := prepareHost(builder, c, c.Host)
 		if err != nil {
 			return nil, err
 		}
-		children = append(children, host)
+		// children = append(children, host)
+		children.Append(host)
 	}
 
 	if c.HostsFile != nil {
@@ -111,26 +116,29 @@ func prepare(c *config) (flunc.Flunc, error) {
 
 		log.Printf("filtered hosts: %#v", hosts)
 
-		var hostFluncs []flunc.Flunc
+		// var hostFluncs []flunc.Flunc
+		hostFluncs := builder.Group()
 		for _, host := range *hosts {
-			host, err := prepareHost(c, host)
+			host, err := prepareHost(builder, c, host)
 			if err != nil {
 				return nil, err
 			}
-			hostFluncs = append(hostFluncs, host)
+			// hostFluncs = append(hostFluncs, host)
+			hostFluncs.Append(host)
 		}
-		children = append(children, flunc.Parallel(hostFluncs...))
+		children.Append(builder.Parallel(hostFluncs.Fluncs()...))
 	}
 
-	return flunc.Sequential(children...), nil
+	return builder.Job(c.Name, children.Fluncs()...), nil
 }
 
-func prepareHost(c *config, host *host) (flunc.Flunc, error) {
+func prepareHost(builder treeBuilder, c *config, host *host) (flunc.Flunc, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
 
-	var children []flunc.Flunc
+	// var children []flunc.Flunc
+	children := builder.Group()
 	logger := func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -143,16 +151,19 @@ func prepareHost(c *config, host *host) (flunc.Flunc, error) {
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	}
-	children = append(children, logger)
+	// children = append(children, logger)
+	children.Append(logger)
 
 	templating := func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, host)
 		return context.WithValue(ctx, templatingKey, tt), nil
 	}
-	children = append(children, templating)
+	// children = append(children, templating)
+	children.Append(templating)
 
-	setupSSH := prepareSSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port), host.User)
-	children = append(children, setupSSH)
+	setupSSH := builder.PrepareSSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port), host.User)
+	// children = append(children, setupSSH)
+	children.Append(setupSSH)
 
 	if f := c.Forwarding; f != nil {
 		forwarding := func(ctx context.Context) (context.Context, error) {
@@ -175,16 +186,18 @@ func prepareHost(c *config, host *host) (flunc.Flunc, error) {
 
 			return nil, nil
 		}
-		children = append(children, forwarding)
+		// children = append(children, forwarding)
+		children.Append(forwarding)
 	}
 
-	cmd, err := prepareCommand(c.Command)
+	cmd, err := prepareCommand(builder, c.Command)
 	if err != nil {
 		return nil, err
 	}
-	children = append(children, cmd)
+	// children = append(children, cmd)
+	children.Append(cmd)
 
-	return flunc.Sequential(children...), nil
+	return builder.Host(c, host, children.Fluncs()...), nil
 }
 
 func prepareSSHClient(host, user string) flunc.Flunc {
@@ -206,7 +219,7 @@ func prepareSSHClient(host, user string) flunc.Flunc {
 	}
 }
 
-func prepareCommand(cmd *command) (flunc.Flunc, error) {
+func prepareCommand(builder treeBuilder, cmd *command) (flunc.Flunc, error) {
 	const (
 		sequential = "sequential"
 		parallel   = "parallel"
@@ -220,6 +233,7 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 	}
 
 	var stdout, stderr flunc.Flunc
+	children := builder.Group()
 
 	if cmd.Stdout != "" || cmd.Stderr != "" {
 		if cmd.Stdout != "" {
@@ -304,28 +318,9 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 			}
 		}
 	}
-
-	var childCommands []flunc.Flunc
-	if cmd.Commands != nil && len(cmd.Commands) > 0 {
-		for _, cmd := range cmd.Commands {
-			exec, err := prepareCommand(cmd)
-			if err != nil {
-				return nil, err
-			}
-
-			childCommands = append(childCommands, exec)
-		}
-	}
+	children.Append(stdout, stderr)
 
 	var cmds flunc.Flunc
-
-	if cmd.Flow == sequentialFlow {
-		log.Println("Sequential")
-		cmds = flunc.Sequential(childCommands...)
-	} else {
-		log.Println("Parallel")
-		cmds = flunc.Parallel(childCommands...)
-	}
 
 	if cmd.Command != "" {
 		cmds = func(ctx context.Context) (context.Context, error) {
@@ -359,11 +354,36 @@ func prepareCommand(cmd *command) (flunc.Flunc, error) {
 			err = s.executeCommand(ctx, command, stdout, stderr)
 			return nil, err
 		}
+	} else if cmd.Commands != nil && len(cmd.Commands) > 0 {
+		childCommands := builder.Group()
+
+		for _, cmd := range cmd.Commands {
+			log.Printf("%#v", cmd)
+			exec, err := prepareCommand(builder, cmd)
+			if err != nil {
+				return nil, err
+			}
+
+			childCommands.Append(exec)
+		}
+
+		if cmd.Flow == sequentialFlow {
+			cmds = builder.Sequential(childCommands.Fluncs()...)
+		} else if cmd.Flow == parallelFlow {
+			cmds = builder.Parallel(childCommands.Fluncs()...)
+		} else {
+			err := fmt.Errorf("unknown flow %q", cmd.Flow)
+			log.Println(err)
+			return nil, err
+		}
+	} else {
+		err := fmt.Errorf("either 'command' or 'commands' has to be specified")
+		log.Println(err)
+
+		return nil, err
 	}
 
-	return flunc.Sequential(
-		stdout,
-		stderr,
-		cmds,
-	), nil
+	children.Append(cmds)
+
+	return builder.Command(cmd, children.Fluncs()...), nil
 }

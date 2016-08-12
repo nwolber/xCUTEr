@@ -51,6 +51,7 @@ type scp struct {
 }
 
 type command struct {
+	Name     string     `json:"name,omitempty"`
 	Command  string     `json:"command,omitempty"`
 	Commands []*command `json:"commands,omitempty`
 	Flow     string     `json:"flow,omit"`

@@ -38,12 +38,16 @@ func main() {
 	cron := scheduler.New()
 
 	start := time.Now()
-	f, err := prepare(conf)
+	f, err := prepare(&executionTreeBuilder{}, conf)
 	stop := time.Now()
 	log.Println("job preparation took", stop.Sub(start))
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	builder := newStringBuilder()
+	prepare(builder, conf)
+	log.Fatalln("Execution tree:\n" + builder.String())
 
 	exec := func() {
 		ctx, cancel := context.WithCancel(context.Background())
