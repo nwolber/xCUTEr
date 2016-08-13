@@ -5,62 +5,16 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"github.com/nwolber/xCUTEr/flunc"
-
-	"golang.org/x/net/context"
 )
 
-type stackElement struct {
-	current []fmt.Stringer
+type stringVisitor struct {
+	full bool
 }
 
-type stringerStack []*stackElement
+type simple string
 
-func (s stringerStack) Push(v *stackElement) stringerStack {
-	return append(s, v)
-}
-
-func (s stringerStack) Pop() (stringerStack, *stackElement) {
-	l := len(s)
-
-	if l == 0 {
-		return s, nil
-	}
-
-	return s[:l-1], s[l-1]
-}
-
-func (s stringerStack) Peek() *stackElement {
-	l := len(s)
-
-	if l == 0 {
-		return nil
-	}
-
-	return s[l-1]
-}
-
-type stringBuilder struct {
-	stack stringerStack
-	// current []fmt.Stringer
-}
-
-func newStringBuilder() *stringBuilder {
-	return &stringBuilder{
-		stack: stringerStack{
-			&stackElement{},
-		},
-	}
-}
-
-func (s *stringBuilder) String() string {
-	if len(s.stack) > 1 {
-		log.Println("warning: there is more than one stringer on the stack")
-	}
-
-	elem := s.stack.Peek()
-	return elem.current[0].String()
+func (s simple) String() string {
+	return string(s)
 }
 
 type multiple struct {
@@ -68,20 +22,40 @@ type multiple struct {
 	stringers []fmt.Stringer
 }
 
-func (s *multiple) String() string {
-	str := s.typ + "\n"
+func (s *multiple) Append(children ...interface{}) {
+	for _, cc := range children {
+		if cc == nil {
+			continue
+		}
 
+		f, ok := cc.(fmt.Stringer)
+		if !ok {
+			log.Panicf("not a fmt.Stringer %T", cc)
+		}
+
+		s.stringers = append(s.stringers, f)
+	}
+}
+
+func (s *multiple) Wrap() interface{} {
+	return s
+}
+
+func (s *multiple) String() string {
+	str := s.typ
 	l := len(s.stringers)
+
+	if l <= 0 {
+		return str
+	}
+
+	str += "\n"
+
 	for i := 0; i < len(s.stringers)-1; i++ {
 		sub := s.stringers[i].String()
 		sub = strings.Replace(sub, "\n", "\n│  ", -1)
 
 		str += "├─ " + sub + "\n"
-	}
-	if l <= 0 {
-		log.Println("l is", l)
-		log.Println("str is", str)
-		return str
 	}
 
 	sub := s.stringers[l-1].String()
@@ -91,212 +65,106 @@ func (s *multiple) String() string {
 	return str
 }
 
-func (s *stringBuilder) Sequential(children ...flunc.Flunc) flunc.Flunc {
-	var elem *stackElement
-	s.stack, elem = s.stack.Pop()
-
-	if len(elem.current) == 0 {
-		log.Println("pling")
-		return nil
+func (*stringVisitor) Sequential() group {
+	return &multiple{
+		typ: "Sequential",
 	}
+}
 
-	str := &multiple{
-		typ:       "Sequential",
-		stringers: elem.current,
+func (*stringVisitor) Parallel() group {
+	return &multiple{
+		typ: "Parallel",
 	}
-	elem = s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
+}
 
+func (*stringVisitor) Job(name string) group {
+	return &multiple{
+		typ: name,
+	}
+}
+
+func (s *stringVisitor) JobLogger(jobName string) interface{} {
+	if s.full {
+		return simple("Create job logger")
+	}
 	return nil
 }
 
-func (s *stringBuilder) Parallel(children ...flunc.Flunc) flunc.Flunc {
-	var elem *stackElement
-	s.stack, elem = s.stack.Pop()
+func (s *stringVisitor) HostLogger(jobName string, h *host) interface{} {
+	if s.full {
+		return simple("Create host logger")
+	}
+	return nil
+}
 
-	if len(elem.current) == 0 {
-		log.Println("plong")
-		return nil
+func (*stringVisitor) Timeout(timeout time.Duration) interface{} {
+	return simple(fmt.Sprint("Timeout: ", timeout))
+}
+
+func (*stringVisitor) SCP(scp *scp) interface{} {
+	return simple("SCP listen on " + scp.Addr)
+}
+
+func (*stringVisitor) Host(c *config, h *host) group {
+	return &multiple{
+		typ: "Host " + h.Addr,
+	}
+}
+
+func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
+	stringer, ok := child.(fmt.Stringer)
+	if !ok {
+		log.Panicf("not a fmt.Stringer %T", child)
 	}
 
-	str := &multiple{
-		typ:       "Parallel",
-		stringers: elem.current,
+	if s.full {
+		return &multiple{
+			typ: "Error safeguard",
+			stringers: []fmt.Stringer{
+				stringer,
+			},
+		}
 	}
-	elem = s.stack.Peek()
-	// elem.current = append([]fmt.Stringer{str}, elem.current...)
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-
-	return nil
+	return child
 }
 
-type stringBuilderGroup struct {
-	s        *stringBuilder
-	children []fmt.Stringer
-}
-
-func (s *stringBuilderGroup) Append(children ...flunc.Flunc) {
-}
-
-func (s *stringBuilderGroup) Fluncs() []flunc.Flunc {
-	return nil
-}
-
-func (s *stringBuilder) Group(children ...flunc.Flunc) group {
-	s.stack = s.stack.Push(&stackElement{})
-	return &stringBuilderGroup{s: s}
-}
-
-type partTimeout struct {
-	timeout time.Duration
-}
-
-func (t *partTimeout) String() string {
-	return fmt.Sprint("timeout:", t.timeout)
-}
-
-func (s *stringBuilder) Timeout(timeout time.Duration) {
-	str := &partTimeout{timeout: timeout}
-
-	elem := s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-}
-
-type partSCP struct {
-	addr string
-}
-
-func (p *partSCP) String() string {
-	return fmt.Sprint("SCP listen on", p.addr)
-}
-
-func (s *stringBuilder) DoSCP(ctx context.Context, privateKey []byte, addr string) error {
-	str := &partSCP{addr: addr}
-	elem := s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-	return nil
-}
-
-func (s *stringBuilder) Host(c *config, h *host, children ...flunc.Flunc) flunc.Flunc {
-	var elem *stackElement
-	s.stack, elem = s.stack.Pop()
-
-	str := &multiple{
-		typ:       fmt.Sprint("Host ", h.Addr),
-		stringers: elem.current,
+func (s *stringVisitor) Templating(c *config, h *host) interface{} {
+	if s.full {
+		return simple("Create templating engine")
 	}
-	elem = s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
 	return nil
 }
 
-type partSSHClient struct {
-	host, user string
+func (*stringVisitor) SSHClient(host, user string) interface{} {
+	return simple(fmt.Sprintf("Open SSH connection to %s@%s", user, host))
 }
 
-func (p *partSSHClient) String() string {
-	return fmt.Sprintf("Open SSH connection to %s@%s", p.user, p.host)
+func (*stringVisitor) Forwarding(f *forwarding) interface{} {
+	return simple(fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort))
 }
 
-func (s *stringBuilder) PrepareSSHClient(host, user string) flunc.Flunc {
-	str := &partSSHClient{
-		host: host,
-		user: user,
+func (s *stringVisitor) Commands(cmd *command) group {
+	return &multiple{
+		// typ: s.Command(cmd).(fmt.Stringer).String(),
+		typ: "Command",
 	}
-	elem := s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-	return nil
 }
 
-type partForward struct {
-	remoteAddr, localAddr string
-}
-
-func (p *partForward) String() string {
-	return fmt.Sprintf("forward %s to %s", p.remoteAddr, p.localAddr)
-}
-
-func (s *stringBuilder) Forward(client *sshClient, ctx context.Context, remoteAddr, localAddr string) {
-	str := &partForward{remoteAddr: remoteAddr, localAddr: localAddr}
-	elem := s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-}
-
-type partCommand struct {
-	cmd *command
-}
-
-func (p *partCommand) String() string {
+func (*stringVisitor) Command(cmd *command) interface{} {
 	var str string
-	cmd := p.cmd
-
-	if cmd.Flow != "" {
-		str = strings.Title(cmd.Flow) + " "
-	} else {
-		str = "Command "
-	}
-
-	if cmd.Name != "" {
-		str += cmd.Name + " "
-	}
-
-	str += "{"
-
-	if cmd.Stdout != "" {
-		str += fmt.Sprintf(" Stdout: %q", cmd.Stdout)
-	}
-
-	if cmd.Stderr != "" {
-		str += fmt.Sprintf(" Stderr: %q", cmd.Stderr)
-	}
-
-	str += " }"
-
 	if cmd.Command != "" {
 		str = fmt.Sprintf("Execute %q", cmd.Command)
+	} else {
+		str = "!!! ERROR !!!"
 	}
 
-	return str
+	return simple(str)
 }
 
-func (s *stringBuilder) Command(cmd *command, children ...flunc.Flunc) flunc.Flunc {
-	str := &partCommand{cmd: cmd}
-
-	if cmd.Command != "" {
-		elem := s.stack.Peek()
-		elem.current = append(elem.current, str)
-	} else if cmd.Commands != nil {
-		var elem *stackElement
-		s.stack, elem = s.stack.Pop()
-
-		mult := &multiple{
-			typ:       str.String(),
-			stringers: elem.current,
-		}
-		elem = s.stack.Peek()
-		elem.current = append(elem.current, mult)
-		// s.Stringer = str
-	}
-	return nil
+func (*stringVisitor) Stdout(file string) interface{} {
+	return simple("Redirect STDOUT to " + file)
 }
 
-func (s *stringBuilder) Job(name string, children ...flunc.Flunc) flunc.Flunc {
-	var elem *stackElement
-	s.stack, elem = s.stack.Pop()
-
-	str := &multiple{
-		typ:       name,
-		stringers: elem.current,
-	}
-	elem = s.stack.Peek()
-	elem.current = append(elem.current, str)
-	// s.Stringer = str
-	return nil
+func (*stringVisitor) Stderr(file string) interface{} {
+	return simple("Redirect STDERR to " + file)
 }

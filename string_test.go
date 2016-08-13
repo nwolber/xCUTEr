@@ -1,97 +1,55 @@
 package main
 
-import "testing"
-
-// func TestExecuteCommand(t *testing.T) {
-// 	s := partExecuteCommand{cmd: &command{Command: "first"}}
-
-// 	want := "Execute \"first\""
-
-// 	if got := s.String(); got != want {
-// 		t.Errorf("want: %q, got: %q", want, got)
-// 	}
-// }
-
-// func TestMultiple(t *testing.T) {
-// 	s := multiple{
-// 		typ: "Sequential",
-// 		stringers: []fmt.Stringer{
-// 			&partExecuteCommand{cmd: &command{Command: "first"}},
-// 			&partExecuteCommand{cmd: &command{Command: "second"}},
-// 		},
-// 	}
-
-// 	want := "Sequential\n" +
-// 		"├─ Execute \"first\"\n" +
-// 		"└─ Execute \"second\""
-
-// 	if got := s.String(); got != want {
-// 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
-// 	}
-// }
-
-// func TestNestedMultiple(t *testing.T) {
-// 	s := multiple{
-// 		typ: "Sequential",
-// 		stringers: []fmt.Stringer{
-// 			&multiple{
-// 				typ: "Parallel",
-// 				stringers: []fmt.Stringer{
-// 					&partExecuteCommand{cmd: &command{Command: "first"}},
-// 					&partExecuteCommand{cmd: &command{Command: "third"}},
-// 				},
-// 			},
-// 			&partExecuteCommand{cmd: &command{Command: "second"}},
-// 		},
-// 	}
-
-// 	want := "Sequential\n" +
-// 		"├─ Parallel\n" +
-// 		"│  ├─ Execute \"first\"\n" +
-// 		"│  └─ Execute \"third\"\n" +
-// 		"└─ Execute \"second\""
-
-// 	if got := s.String(); got != want {
-// 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
-// 	}
-// }
+import (
+	"fmt"
+	"testing"
+)
 
 func TestBuilderCommand(t *testing.T) {
-	s := newStringBuilder()
-	s.Command(&command{Command: "first"})
+	s := &stringVisitor{}
+	c := s.Command(&command{Command: "first"}).(fmt.Stringer)
 
 	want := "Execute \"first\""
 
-	if got := s.String(); got != want {
+	if got := c.String(); got != want {
 		t.Errorf("want: %q, got: %q", want, got)
 	}
 }
 
 func TestBuilderMultiple(t *testing.T) {
-	s := newStringBuilder()
-	s.Group()
-	s.Command(&command{Command: "first"})
-	s.Command(&command{Command: "second"})
-	s.Sequential()
+	s := &stringVisitor{}
+	g := s.Sequential()
+	g.Append(s.Command(&command{Command: "first"}))
+	g.Append(s.Command(&command{Command: "second"}))
 
 	want := "Sequential\n" +
 		"├─ Execute \"first\"\n" +
 		"└─ Execute \"second\""
 
-	if got := s.String(); got != want {
+	if got := g.(fmt.Stringer).String(); got != want {
+		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func TestBuilderEmptyMultiple(t *testing.T) {
+	s := &stringVisitor{}
+	g := s.Sequential()
+
+	want := "Sequential"
+
+	if got := g.(fmt.Stringer).String(); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderNested(t *testing.T) {
-	s := newStringBuilder()
-	s.Group()
-	s.Group()
-	s.Command(&command{Command: "first"})
-	s.Command(&command{Command: "third"})
-	s.Parallel()
-	s.Command(&command{Command: "second"})
-	s.Sequential()
+	s := &stringVisitor{}
+	g1 := s.Sequential()
+	g2 := s.Parallel()
+	g2.Append(s.Command(&command{Command: "first"}))
+	g2.Append(s.Command(&command{Command: "third"}))
+	g1.Append(g2.Wrap())
+	g1.Append(s.Command(&command{Command: "second"}))
 
 	want := "Sequential\n" +
 		"├─ Parallel\n" +
@@ -99,70 +57,45 @@ func TestBuilderNested(t *testing.T) {
 		"│  └─ Execute \"third\"\n" +
 		"└─ Execute \"second\""
 
-	if got := s.String(); got != want {
+	if got := g1.(fmt.Stringer).String(); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
-// func TestBuilderNested2(t *testing.T) {
-// 	s := newStringBuilder()
-// 	s.Group()
-// 	s.Command(&command{Command: "first"})
-// 	s.Group()
-// 	s.Command(&command{Command: "second"})
-// 	s.Command(&command{Command: "third"})
-// 	s.Parallel()
-// 	s.Sequential()
-
-// 	want := "Sequential\n" +
-// 		"├─ Parallel\n" +
-// 		"│  ├─ Execute \"second\"\n" +
-// 		"│  └─ Execute \"third\"\n" +
-// 		"└─ Execute \"first\""
-
-// 	if got := s.String(); got != want {
-// 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
-// 	}
-// }
-
 func TestBuilderNested3(t *testing.T) {
-	s := newStringBuilder()
-	s.Group()
-	s.Group()
-	s.Command(&command{Command: "second"})
-	s.Command(&command{Command: "third"})
-	s.Parallel()
-	s.Sequential()
+	s := &stringVisitor{}
+	g1 := s.Sequential()
+	g2 := s.Parallel()
+	g2.Append(s.Command(&command{Command: "second"}))
+	g2.Append(s.Command(&command{Command: "third"}))
+	g1.Append(g2.Wrap())
 
 	want := "Sequential\n" +
 		"└─ Parallel\n" +
 		"   ├─ Execute \"second\"\n" +
 		"   └─ Execute \"third\""
 
-	if got := s.String(); got != want {
+	if got := g1.(fmt.Stringer).String(); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderNested4(t *testing.T) {
-	s := newStringBuilder()
-	s.Group()
-	s.Command(&command{Command: "first"})
-	s.Command(&command{Command: "second"})
-	s.Group()
-	// s.Command(&command{Command: "second"})
-	s.Command(&command{Command: "third"})
-	s.Parallel()
-	s.Sequential()
+	s := &stringVisitor{}
+	g1 := s.Sequential()
+	g1.Append(s.Command(&command{Command: "first"}))
+	g1.Append(s.Command(&command{Command: "second"}))
+	g2 := s.Parallel()
+	g2.Append(s.Command(&command{Command: "third"}))
+	g1.Append(g2.Wrap())
 
 	want := "Sequential\n" +
 		"├─ Execute \"first\"\n" +
 		"├─ Execute \"second\"\n" +
 		"└─ Parallel\n" +
-		// "   ├─ Execute \"second\"\n" +
 		"   └─ Execute \"third\""
 
-	if got := s.String(); got != want {
+	if got := g1.(fmt.Stringer).String(); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }

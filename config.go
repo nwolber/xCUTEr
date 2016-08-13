@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"regexp"
 )
 
@@ -22,6 +23,15 @@ type config struct {
 	Command    *command    `json:"command,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
 	SCP        *scp        `json:"scp,omitempty"`
+}
+
+func (c *config) String() string {
+	f, err := visitConfig(&stringVisitor{full: true}, c)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	return f.(fmt.Stringer).String()
 }
 
 type hostsFile struct {
