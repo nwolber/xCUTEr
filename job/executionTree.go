@@ -72,7 +72,12 @@ func (e *executionTreeVisitor) Job(name string) group {
 
 func (*executionTreeVisitor) Output(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		output, _ := ctx.Value(outputKey).(io.Writer)
+
 		if file == "" {
+			if output != nil {
+				return context.WithValue(ctx, outputKey, io.MultiWriter(os.Stdout, output)), nil
+			}
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
 
@@ -100,6 +105,10 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			f.Close()
 			log.Println("closed job output file", file)
 		}(ctx, f)
+
+		if output != nil {
+			return context.WithValue(ctx, outputKey, io.MultiWriter(f, output)), nil
+		}
 
 		return context.WithValue(ctx, outputKey, f), nil
 	})

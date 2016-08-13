@@ -58,14 +58,23 @@ func main() {
 		select {
 		case event := <-events:
 			if event.Op&fsnotify.Create == fsnotify.Create {
-				e.Add(event.Name)
+				j, err := parse(event.Name)
+				if err != nil {
+					log.Println("error parsing", event.Name, err)
+				}
+				e.Add(j)
 			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
 				e.Remove(event.Name)
 			} else if event.Op&fsnotify.Rename == fsnotify.Rename {
 				e.Remove(event.Name)
 			} else if event.Op&fsnotify.Write == fsnotify.Write {
 				e.Remove(event.Name)
-				e.Add(event.Name)
+
+				j, err := parse(event.Name)
+				if err != nil {
+					log.Println("error parsing", event.Name, err)
+				}
+				e.Add(j)
 			}
 
 		case s := <-signals:
