@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -17,6 +21,18 @@ func expect(t *testing.T, text string, got, want int) {
 	if got != want {
 		t.Errorf("%s want: %d, got %d", text, want, got)
 	}
+}
+
+func expectExecutor(t *testing.T, e *executor, text string, inactive, scheduled, running, completed int) {
+	expect(t, fmt.Sprintf("%s - inactive", text), len(e.inactive), inactive)
+	expect(t, fmt.Sprintf("%s - scheduled", text), len(e.scheduled), scheduled)
+	expect(t, fmt.Sprintf("%s - running", text), len(e.running), running)
+	expect(t, fmt.Sprintf("%s - completed", text), len(e.completed), completed)
+}
+
+func TestMain(m *testing.M) {
+	log.SetOutput(ioutil.Discard)
+	os.Exit(m.Run())
 }
 
 func TestAddOnce(t *testing.T) {
@@ -66,21 +82,13 @@ func TestRunOnce(t *testing.T) {
 		t.Fatal("expected job to be run immediatelly")
 	}
 
-	if e.getRunning("test.job") == nil {
-		t.Error("expected job in running state")
-	}
+	expectExecutor(t, e, "running", 0, 0, 1, 0)
 
 	close(wait)
 
 	<-done
 
-	if e.getRunning("test.job") != nil {
-		t.Error("expected job to be no longer in running state")
-	}
-
-	if len(e.getCompleted()) != 1 {
-		t.Error("expected job in completed list")
-	}
+	expectExecutor(t, e, "done", 0, 0, 0, 1)
 }
 
 func TestRunTwice(t *testing.T) {
@@ -101,6 +109,7 @@ func TestRunTwice(t *testing.T) {
 			return nil, nil
 		},
 	}
+	expectExecutor(t, e, "before", 0, 0, 0, 0)
 
 	e.Add(j)
 
@@ -110,9 +119,7 @@ func TestRunTwice(t *testing.T) {
 		t.Fatal("expected job to be run immediatelly")
 	}
 
-	if e.getRunning("test.job") == nil {
-		t.Error("expected job in running state")
-	}
+	expectExecutor(t, e, "running", 0, 0, 1, 0)
 
 	e.Add(j)
 
@@ -124,17 +131,12 @@ func TestRunTwice(t *testing.T) {
 	case <-time.After(time.Second):
 	}
 
-	close(wait)
+	expectExecutor(t, e, "running 2", 0, 0, 1, 0)
 
+	close(wait)
 	<-done
 
-	if e.getRunning("test.job") != nil {
-		t.Error("expected job to be no longer in running state")
-	}
-
-	if len(e.getCompleted()) != 1 {
-		t.Error("expected job in completed list")
-	}
+	expectExecutor(t, e, "done", 0, 0, 0, 1)
 }
 
 func TestMaxCompleted(t *testing.T) {
@@ -174,14 +176,6 @@ func TestAddSchedule(t *testing.T) {
 	waitBeforeWake := make(chan struct{})
 	e := newExecutor(context.Background())
 	e.schedule = func(schedule string, f func()) (string, error) {
-		if schedule != wantSchedule {
-			t.Errorf("want schedule: %s, got: %s", wantSchedule, schedule)
-		}
-
-		if f == nil {
-			t.Fatal("exepected a func got nil")
-		}
-
 		go func() {
 			<-waitBeforeWake
 			f()
@@ -206,10 +200,7 @@ func TestAddSchedule(t *testing.T) {
 	}
 	e.Add(j)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 1)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "sleeping", 0, 1, 0, 0)
 
 	close(waitBeforeWake)
 	select {
@@ -218,10 +209,7 @@ func TestAddSchedule(t *testing.T) {
 		t.Fatal("expected job to get scheduled")
 	}
 
-	expect(t, "awake - scheduled", len(e.scheduled), 1)
-	expect(t, "awake - inactive", len(e.inactive), 0)
-	expect(t, "awake - running", len(e.running), 1)
-	expect(t, "awake - completed", len(e.completed), 0)
+	expectExecutor(t, e, "running", 0, 1, 1, 0)
 
 	close(wait)
 
@@ -231,10 +219,7 @@ func TestAddSchedule(t *testing.T) {
 		t.Fatal("expected job to get scheduled")
 	}
 
-	expect(t, "done - scheduled", len(e.scheduled), 1)
-	expect(t, "done - inactive", len(e.inactive), 0)
-	expect(t, "done - running", len(e.running), 0)
-	expect(t, "done - completed", len(e.completed), 1)
+	expectExecutor(t, e, "done", 0, 1, 0, 1)
 }
 
 func TestRemoveBeforeWake(t *testing.T) {
@@ -246,51 +231,26 @@ func TestRemoveBeforeWake(t *testing.T) {
 	waitBeforeWake := make(chan struct{})
 	e := newExecutor(context.Background())
 	e.schedule = func(schedule string, f func()) (string, error) {
-		if schedule != wantSchedule {
-			t.Errorf("want schedule: %s, got: %s", wantSchedule, schedule)
-		}
-
-		if f == nil {
-			t.Fatal("exepected a func got nil")
-		}
-
 		go func() {
 			<-waitBeforeWake
-			f()
 		}()
 		return "TEST-ID", nil
 	}
 
-	wait := make(chan struct{})
-	done := make(chan struct{})
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
 			Name:     "Test Job",
 			Schedule: wantSchedule,
 		},
-		f: func(ctx context.Context) (context.Context, error) {
-			done <- struct{}{}
-			<-wait
-			done <- struct{}{}
-			return nil, nil
-		},
 	}
 	e.Add(j)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 1)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "before", 0, 1, 0, 0)
 
 	e.Remove(file)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 0)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
-
-	close(waitBeforeWake)
+	expectExecutor(t, e, "after", 0, 0, 0, 0)
 }
 
 func TestRemoveWhileRunning(t *testing.T) {
@@ -302,14 +262,6 @@ func TestRemoveWhileRunning(t *testing.T) {
 	waitBeforeWake := make(chan struct{})
 	e := newExecutor(context.Background())
 	e.schedule = func(schedule string, f func()) (string, error) {
-		if schedule != wantSchedule {
-			t.Errorf("want schedule: %s, got: %s", wantSchedule, schedule)
-		}
-
-		if f == nil {
-			t.Fatal("exepected a func got nil")
-		}
-
 		go func() {
 			<-waitBeforeWake
 			f()
@@ -328,16 +280,12 @@ func TestRemoveWhileRunning(t *testing.T) {
 		f: func(ctx context.Context) (context.Context, error) {
 			done <- struct{}{}
 			<-wait
-			done <- struct{}{}
 			return nil, nil
 		},
 	}
 	e.Add(j)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 1)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "sleeping", 0, 1, 0, 0)
 
 	close(waitBeforeWake)
 	select {
@@ -345,13 +293,11 @@ func TestRemoveWhileRunning(t *testing.T) {
 	case <-time.After(gracePeriod):
 		t.Fatal("expected job to get scheduled")
 	}
+	expectExecutor(t, e, "running", 0, 1, 1, 0)
 
 	e.Remove(file)
 
-	expect(t, "awake - scheduled", len(e.scheduled), 0)
-	expect(t, "awake - inactive", len(e.inactive), 0)
-	expect(t, "awake - running", len(e.running), 0)
-	expect(t, "awake - completed", len(e.completed), 0)
+	expectExecutor(t, e, "after", 0, 0, 0, 0)
 }
 
 func TestRemoveAfterDone(t *testing.T) {
@@ -363,14 +309,6 @@ func TestRemoveAfterDone(t *testing.T) {
 	waitBeforeWake := make(chan struct{})
 	e := newExecutor(context.Background())
 	e.schedule = func(schedule string, f func()) (string, error) {
-		if schedule != wantSchedule {
-			t.Errorf("want schedule: %s, got: %s", wantSchedule, schedule)
-		}
-
-		if f == nil {
-			t.Fatal("exepected a func got nil")
-		}
-
 		go func() {
 			<-waitBeforeWake
 			f()
@@ -395,10 +333,7 @@ func TestRemoveAfterDone(t *testing.T) {
 	}
 	e.Add(j)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 1)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "sleeping", 0, 1, 0, 0)
 
 	close(waitBeforeWake)
 	select {
@@ -407,10 +342,7 @@ func TestRemoveAfterDone(t *testing.T) {
 		t.Fatal("expected job to get scheduled")
 	}
 
-	expect(t, "awake - scheduled", len(e.scheduled), 1)
-	expect(t, "awake - inactive", len(e.inactive), 0)
-	expect(t, "awake - running", len(e.running), 1)
-	expect(t, "awake - completed", len(e.completed), 0)
+	expectExecutor(t, e, "awake", 0, 1, 1, 0)
 
 	close(wait)
 
@@ -422,10 +354,7 @@ func TestRemoveAfterDone(t *testing.T) {
 
 	e.Remove(file)
 
-	expect(t, "done - scheduled", len(e.scheduled), 0)
-	expect(t, "done - inactive", len(e.inactive), 0)
-	expect(t, "done - running", len(e.running), 0)
-	expect(t, "done - completed", len(e.completed), 1)
+	expectExecutor(t, e, "done", 0, 0, 0, 1)
 }
 
 func TestAddInactive(t *testing.T) {
@@ -438,42 +367,20 @@ func TestAddInactive(t *testing.T) {
 	e := newExecutor(context.Background())
 	e.manualActive = true
 	e.schedule = func(schedule string, f func()) (string, error) {
-		if schedule != wantSchedule {
-			t.Errorf("want schedule: %s, got: %s", wantSchedule, schedule)
-		}
-
-		if f == nil {
-			t.Fatal("exepected a func got nil")
-		}
-
-		go func() {
-			<-waitBeforeWake
-			f()
-		}()
+		<-waitBeforeWake
 		return "TEST-ID", nil
 	}
 
-	wait := make(chan struct{})
-	done := make(chan struct{})
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
 			Name:     "Test Job",
 			Schedule: wantSchedule,
 		},
-		f: func(ctx context.Context) (context.Context, error) {
-			done <- struct{}{}
-			<-wait
-			done <- struct{}{}
-			return nil, nil
-		},
 	}
 	e.Add(j)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 0)
-	expect(t, "sleeping - inactive", len(e.inactive), 1)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "inactive", 1, 0, 0, 0)
 }
 
 func TestRemoveInactive(t *testing.T) {
@@ -486,30 +393,19 @@ func TestRemoveInactive(t *testing.T) {
 	e := newExecutor(context.Background())
 	e.manualActive = true
 	e.schedule = func(schedule string, f func()) (string, error) {
-		go func() {
-			<-waitBeforeWake
-			f()
-		}()
+		<-waitBeforeWake
 		return "TEST-ID", nil
 	}
 
-	done := make(chan struct{})
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
 			Name:     "Test Job",
 			Schedule: wantSchedule,
 		},
-		f: func(ctx context.Context) (context.Context, error) {
-			done <- struct{}{}
-			return nil, nil
-		},
 	}
 	e.Add(j)
 	e.Remove(file)
 
-	expect(t, "sleeping - scheduled", len(e.scheduled), 0)
-	expect(t, "sleeping - inactive", len(e.inactive), 0)
-	expect(t, "sleeping - running", len(e.running), 0)
-	expect(t, "sleeping - completed", len(e.completed), 0)
+	expectExecutor(t, e, "after", 0, 0, 0, 0)
 }
