@@ -10,12 +10,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
-
-	"github.com/nwolber/xCUTEr/job"
-	scheduler "github.com/robfig/cron"
 
 	"golang.org/x/net/context"
+
+	"github.com/fsnotify/fsnotify"
+	scheduler "github.com/nwolber/cron"
 
 	_ "net/http/pprof"
 )
@@ -25,63 +24,67 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
+	log.SetFlags(log.Flags() | log.Lshortfile)
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
-	conf, err := job.ReadConfig("config.job")
-	if err != nil {
-		log.Fatalln("config:", err)
-	}
-
-	log.Printf("%#v\n", conf)
-	log.SetFlags(log.Flags() | log.Lshortfile)
-
-	cron := scheduler.New()
-
-	start := time.Now()
-	f, err := job.ExecutionTree(conf)
-	stop := time.Now()
-	log.Println("job preparation took", stop.Sub(start))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.Printf("Execution tree:\n%s", conf)
-
 	mainCtx, mainCancel := context.WithCancel(context.Background())
 
-	done := make(chan struct{})
-	exec := func() {
-		ctx, cancel := context.WithCancel(mainCtx)
-		defer cancel()
+	events := make(chan fsnotify.Event)
+	w := &watcher{
+		path: ".",
+	}
+	go w.watch(mainCtx, events)
 
-		start := time.Now()
-		_, err = f(ctx)
-		stop := time.Now()
-		if err != nil {
-			log.Println("execution failed", err)
-		} else {
-			log.Println("execution complete")
+	e := &executor{
+		mainCtx:   mainCtx,
+		cron:      scheduler.New(),
+		scheduled: make(map[string]*schedInfo),
+		running:   make(map[string]*runInfo),
+	}
+
+	e.cron.Start()
+
+	for {
+		select {
+		case event := <-events:
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				// log.Println("Create")
+				e.Add(event.Name)
+			} else if event.Op&fsnotify.Chmod == fsnotify.Chmod {
+				// log.Println("Chmod")
+			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				// log.Println("Remove")
+				e.Remove(event.Name)
+			} else if event.Op&fsnotify.Rename == fsnotify.Rename {
+				// log.Println("Rename")
+				e.Remove(event.Name)
+			} else if event.Op&fsnotify.Write == fsnotify.Write {
+				// log.Println("Write")
+				e.Remove(event.Name)
+				e.Add(event.Name)
+			}
+
+			// switch event.Op {
+			// case fsnotify.Create:
+			// 	e.Add(event.Name)
+			// case fsnotify.Remove:
+			// 	e.Remove(event.Name)
+			// case fsnotify.Rename:
+			// 	log.Println("rename", event.Name)
+			// case fsnotify.Chmod:
+			// 	e.Remove(event.Name)
+			// 	e.Add(event.Name)
+			// }
+
+		case s := <-signals:
+			fmt.Println("Got signal:", s)
+			e.cron.Stop()
+			mainCancel()
+			return
 		}
-		log.Println("execution took", stop.Sub(start))
 	}
-
-	if conf.Schedule == "once" {
-		go func() {
-			exec()
-			close(done)
-		}()
-	} else {
-		cron.AddFunc(conf.Schedule, exec)
-		cron.Start()
-		defer cron.Stop()
-	}
-	select {
-	case <-done:
-	case s := <-signals:
-		fmt.Println("Got signal:", s)
-	}
-	mainCancel()
 
 	log.Println("fin")
 }

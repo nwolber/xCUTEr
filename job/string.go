@@ -146,10 +146,18 @@ func (p *partHost) String() string {
 	return p.multiple.String()
 }
 
-func (s *stringVisitor) Host(c *config, h *host) group {
+func (s *stringVisitor) Host(c *Config, h *host) group {
+	var name string
+
+	if h.Name != "" {
+		name = h.Name
+	} else {
+		name = h.Addr
+	}
+
 	p := &partHost{
 		multiple: &multiple{
-			typ: "Host " + h.Addr,
+			typ: "Host " + name,
 		},
 		old: s.tt,
 		s:   s,
@@ -181,7 +189,7 @@ func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
 	return child
 }
 
-func (s *stringVisitor) Templating(c *config, h *host) interface{} {
+func (s *stringVisitor) Templating(c *Config, h *host) interface{} {
 	if s.full {
 		return simple("Create templating engine")
 	}

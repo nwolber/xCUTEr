@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func ExecutionTree(c *config) (flunc.Flunc, error) {
+func ExecutionTree(c *Config) (flunc.Flunc, error) {
 	f, err := visitConfig(&executionTreeVisitor{}, c)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Host(c *config, h *host) group {
+func (e *executionTreeVisitor) Host(c *Config, h *host) group {
 	return e.Sequential()
 }
 
@@ -194,7 +194,7 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Templating(c *config, h *host) interface{} {
+func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
 		return context.WithValue(ctx, templatingKey, tt), nil

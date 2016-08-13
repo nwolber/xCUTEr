@@ -12,12 +12,12 @@ import (
 )
 
 type templatingEngine struct {
-	Config *config
+	Config *Config
 	Host   *host
 	now    func() time.Time
 }
 
-func newTemplatingEngine(c *config, h *host) *templatingEngine {
+func newTemplatingEngine(c *Config, h *host) *templatingEngine {
 	return &templatingEngine{
 		Config: c,
 		Host:   h,
@@ -48,7 +48,7 @@ func (t *templatingEngine) Interpolate(templ string) (string, error) {
 	}
 
 	data := struct {
-		Config *config
+		Config *Config
 		Host   *host
 		Now    time.Time
 	}{

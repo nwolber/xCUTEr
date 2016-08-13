@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/nwolber/xCUTEr/flow"
 	"golang.org/x/crypto/ssh"
@@ -18,8 +19,9 @@ import (
 )
 
 type storeElement struct {
-	ref    int
-	client *sshClient
+	ref      int
+	client   *sshClient
+	lastUsed time.Time
 }
 
 type sshClientStore struct {
@@ -27,10 +29,36 @@ type sshClientStore struct {
 	m       sync.Mutex
 }
 
-var (
-	store = &sshClientStore{
+func newSSHClientStore() *sshClientStore {
+	store := &sshClientStore{
 		clients: make(map[string]*storeElement),
 	}
+
+	// This go routine runs for the lifetime of the program.
+	go func() {
+		for {
+			<-time.Tick(time.Minute)
+
+			func() {
+				store.m.Lock()
+				defer store.m.Unlock()
+
+				for key, elem := range store.clients {
+					if diff := time.Now().Sub(elem.lastUsed); elem.ref == 0 && diff > time.Minute*10 {
+						log.Println("connection to", key, "unused for", diff, "closing")
+						elem.client.c.Close()
+						delete(store.clients, key)
+					}
+				}
+			}()
+		}
+	}()
+
+	return store
+}
+
+var (
+	store = newSSHClientStore()
 )
 
 func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
@@ -47,30 +75,23 @@ func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 			return nil, err
 		}
 
-		store.clients[key] = &storeElement{
-			ref:    1,
+		elem = &storeElement{
 			client: client,
 		}
-
-		go func(ctx context.Context, client *sshClient) {
-			<-ctx.Done()
-			store.m.Lock()
-			defer store.m.Unlock()
-
-			elem := store.clients[key]
-			elem.ref--
-
-			if elem.ref == 0 {
-				elem.client.c.Close()
-				log.Println("connection to", addr, "closed")
-				delete(store.clients, key)
-			}
-		}(ctx, client)
-
-		return client, nil
+		store.clients[key] = elem
 	}
 
 	elem.ref++
+	elem.lastUsed = time.Now()
+
+	go func(ctx context.Context, client *sshClient) {
+		<-ctx.Done()
+		store.m.Lock()
+		defer store.m.Unlock()
+
+		store.clients[key].ref--
+	}(ctx, elem.client)
+
 	return elem.client, nil
 }
 

@@ -32,9 +32,9 @@ type configVisitor interface {
 	HostLogger(jobName string, h *host) interface{}
 	Timeout(timeout time.Duration) interface{}
 	SCP(scp *scp) interface{}
-	Host(c *config, h *host) group
+	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
-	Templating(c *config, h *host) interface{}
+	Templating(c *Config, h *host) interface{}
 	SSHClient(host, user string) interface{}
 	Forwarding(f *forwarding) interface{}
 	Commands(cmd *command) group
@@ -48,7 +48,7 @@ type group interface {
 	Wrap() interface{}
 }
 
-func visitConfig(builder configVisitor, c *config) (interface{}, error) {
+func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 	if c.Host == nil && c.HostsFile == nil {
 		return nil, errors.New("either 'host' or 'hostsFile' must be present")
 	}
@@ -109,7 +109,7 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 	return children.Wrap(), nil
 }
 
-func visitHost(builder configVisitor, c *config, host *host) (group, error) {
+func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}

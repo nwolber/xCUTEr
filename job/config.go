@@ -15,7 +15,7 @@ import (
 
 type hostConfig map[string]*host
 
-type config struct {
+type Config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
 	Timeout    string      `json:"timeout,omitempty"`
@@ -27,7 +27,7 @@ type config struct {
 	SCP        *scp        `json:"scp,omitempty"`
 }
 
-func (c *config) String() string {
+func (c *Config) String() string {
 	f, err := visitConfig(&stringVisitor{
 		full: true,
 		tt: &templatingEngine{
@@ -83,8 +83,8 @@ func (c *command) String() string {
 	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q")
 }
 
-func ReadConfig(file string) (*config, error) {
-	var c config
+func ReadConfig(file string) (*Config, error) {
+	var c Config
 
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -116,9 +116,13 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 	}
 
 	filteredHosts := make(hostConfig)
-	for k, v := range hosts {
+	for k, host := range hosts {
+		if host.Name == "" {
+			host.Name = k
+		}
+
 		if regex.MatchString(k) {
-			filteredHosts[k] = v
+			filteredHosts[k] = host
 		}
 	}
 

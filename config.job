@@ -1,7 +1,8 @@
 {
     "name": "Test Job",
-    "schedule": "once",
+    "schedule": "@every 10s",
     "timeout": "1m",
+    "output": "bla.txt",
     "hosts": {
         "file": "hosts.json",
         "pattern": ".*"
