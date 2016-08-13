@@ -3,5 +3,7 @@ xCUTEr
 *.txt
 *.html
 *.json
+*.log
+*.job
 id_rsa*
 password

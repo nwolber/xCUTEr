@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/nwolber/xCUTEr/job"
 	scheduler "github.com/robfig/cron"
 
 	"golang.org/x/net/context"
@@ -27,9 +28,9 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
-	conf, err := readConfig("config.json")
+	conf, err := job.ReadConfig("config.job")
 	if err != nil {
-		log.Println("config:", err)
+		log.Fatalln("config:", err)
 	}
 
 	log.Printf("%#v\n", conf)
@@ -38,7 +39,7 @@ func main() {
 	cron := scheduler.New()
 
 	start := time.Now()
-	f, err := executionTree(conf)
+	f, err := job.ExecutionTree(conf)
 	stop := time.Now()
 	log.Println("job preparation took", stop.Sub(start))
 	if err != nil {
@@ -52,7 +53,6 @@ func main() {
 	done := make(chan struct{})
 	exec := func() {
 		ctx, cancel := context.WithCancel(mainCtx)
-		ctx = context.WithValue(ctx, outputKey, os.Stdout)
 		defer cancel()
 
 		start := time.Now()
@@ -64,7 +64,6 @@ func main() {
 			log.Println("execution complete")
 		}
 		log.Println("execution took", stop.Sub(start))
-
 	}
 
 	if conf.Schedule == "once" {

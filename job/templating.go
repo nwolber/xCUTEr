@@ -2,7 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE file for more information.
 
-package main
+package job
 
 import (
 	"bytes"
@@ -14,12 +14,14 @@ import (
 type templatingEngine struct {
 	Config *config
 	Host   *host
+	now    func() time.Time
 }
 
 func newTemplatingEngine(c *config, h *host) *templatingEngine {
 	return &templatingEngine{
 		Config: c,
 		Host:   h,
+		now:    time.Now,
 	}
 }
 
@@ -34,7 +36,7 @@ func (t *templatingEngine) Interpolate(templ string) (string, error) {
 			return fmt.Sprintf("%02d:%02d:%02d", t.Hour(), t.Minute(), t.Second())
 		},
 		"now": func() time.Time {
-			return time.Now()
+			return t.now()
 		},
 	}
 

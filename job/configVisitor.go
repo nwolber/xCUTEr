@@ -2,7 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE file for more information.
 
-package main
+package job
 
 import (
 	"errors"
@@ -27,6 +27,7 @@ type configVisitor interface {
 	Sequential() group
 	Parallel() group
 	Job(name string) group
+	Output(file string) interface{}
 	JobLogger(jobName string) interface{}
 	HostLogger(jobName string, h *host) interface{}
 	Timeout(timeout time.Duration) interface{}
@@ -48,8 +49,6 @@ type group interface {
 }
 
 func visitConfig(builder configVisitor, c *config) (interface{}, error) {
-	children := builder.Job(c.Name)
-
 	if c.Host == nil && c.HostsFile == nil {
 		return nil, errors.New("either 'host' or 'hostsFile' must be present")
 	}
@@ -58,6 +57,9 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 		return nil, errors.New("either 'host' or 'hostsFile' may be present")
 	}
 
+	children := builder.Job(c.Name)
+	children.Append(builder.Templating(c, nil))
+	children.Append(builder.Output(c.Output))
 	children.Append(builder.JobLogger(c.Name))
 
 	if c.Timeout != "" {
@@ -85,8 +87,6 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		log.Printf("filtered hosts: %#v", hosts)
 
 		hostFluncs := builder.Parallel()
 		for _, host := range *hosts {
@@ -170,7 +170,6 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 		}
 
 		for _, cmd := range cmd.Commands {
-			log.Printf("%#v", cmd)
 			exec, err := visitCommand(builder, cmd)
 			if err != nil {
 				return nil, err

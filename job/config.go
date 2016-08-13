@@ -2,7 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE file for more information.
 
-package main
+package job
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"regexp"
+	"time"
 )
 
 type hostConfig map[string]*host
@@ -18,6 +19,7 @@ type config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
 	Timeout    string      `json:"timeout,omitempty"`
+	Output     string      `json:"output,omitempty"`
 	Host       *host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
 	Command    *command    `json:"command,omitempty"`
@@ -26,7 +28,15 @@ type config struct {
 }
 
 func (c *config) String() string {
-	f, err := visitConfig(&stringVisitor{full: true}, c)
+	f, err := visitConfig(&stringVisitor{
+		full: true,
+		tt: &templatingEngine{
+			Config: c,
+			now: func() time.Time {
+				return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+			},
+		},
+	}, c)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -73,7 +83,7 @@ func (c *command) String() string {
 	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q")
 }
 
-func readConfig(file string) (*config, error) {
+func ReadConfig(file string) (*config, error) {
 	var c config
 
 	b, err := ioutil.ReadFile(file)

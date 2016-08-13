@@ -2,7 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE file for more information.
 
-package main
+package job
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 
 type stringVisitor struct {
 	full bool
+	tt   *templatingEngine
 }
 
 type simple string
@@ -85,6 +86,21 @@ func (*stringVisitor) Job(name string) group {
 	return &multiple{
 		typ: name,
 	}
+}
+
+func (s *stringVisitor) Output(file string) interface{} {
+	if file == "" {
+		return nil
+	}
+
+	if s.tt != nil {
+		newFile, err := s.tt.Interpolate(file)
+		if err == nil {
+			file = newFile
+		}
+	}
+
+	return simple("Output: " + file)
 }
 
 func (s *stringVisitor) JobLogger(jobName string) interface{} {

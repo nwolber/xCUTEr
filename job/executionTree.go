@@ -2,7 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE file for more information.
 
-package main
+package job
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func executionTree(c *config) (flunc.Flunc, error) {
+func ExecutionTree(c *config) (flunc.Flunc, error) {
 	f, err := visitConfig(&executionTreeVisitor{}, c)
 	if err != nil {
 		return nil, err
@@ -62,6 +62,45 @@ func (e *executionTreeVisitor) Parallel() group {
 
 func makeFlunc(f flunc.Flunc) flunc.Flunc {
 	return f
+}
+
+func (e *executionTreeVisitor) Job(name string) group {
+	return e.Sequential()
+}
+
+func (*executionTreeVisitor) Output(file string) interface{} {
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		if file == "" {
+			return context.WithValue(ctx, outputKey, os.Stdout), nil
+		}
+
+		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		if !ok {
+			err := fmt.Errorf("no %s available", templatingKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		file, err := tt.Interpolate(file)
+		if err != nil {
+			log.Println("error parsing template string", file, err)
+			return nil, err
+		}
+
+		f, err := os.Create(file)
+		if err != nil {
+			err = fmt.Errorf("unable to open job output file %s %s", file, err)
+			return nil, err
+		}
+
+		go func(ctx context.Context, f io.Closer) {
+			<-ctx.Done()
+			f.Close()
+			log.Println("closed job output file", file)
+		}(ctx, f)
+
+		return context.WithValue(ctx, outputKey, f), nil
+	})
 }
 
 func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
@@ -171,11 +210,13 @@ func (*executionTreeVisitor) SSHClient(host, user string) interface{} {
 			return nil, err
 		}
 
+		l.Println("connecting to ", host)
 		s, err := newSSHClient(ctx, host, user)
 		if err != nil {
 			l.Println("ssh client setup failed", err)
 			return nil, err
 		}
+		l.Println("connected to ", host)
 
 		return context.WithValue(ctx, sshClientKey, s), nil
 	})
@@ -320,8 +361,4 @@ func (*executionTreeVisitor) Stderr(file string) interface{} {
 
 		return context.WithValue(ctx, stderrKey, f), nil
 	})
-}
-
-func (e *executionTreeVisitor) Job(name string) group {
-	return e.Sequential()
 }
