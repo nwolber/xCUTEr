@@ -284,7 +284,7 @@ func (e *executor) addComplete(info *runInfo) {
 	}
 }
 
-func (e *executor) getCompleted() []*runInfo {
+func (e *executor) GetCompleted() []*runInfo {
 	e.mCompleted.Lock()
 	defer e.mCompleted.Unlock()
 

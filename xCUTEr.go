@@ -83,7 +83,7 @@ func New(jobDir string, sshTTL time.Duration, logFile string) xcuter {
 		Inactive:        e.GetInactive,
 		Scheduled:       e.GetScheduled,
 		Running:         e.GetRunning,
-		Completed:       e.getCompleted,
+		Completed:       e.GetCompleted,
 		MaxCompleted:    func() uint32 { return e.maxCompleted },
 		SetMaxCompleted: func(max uint32) { atomic.StoreUint32(&e.maxCompleted, max) },
 	}
