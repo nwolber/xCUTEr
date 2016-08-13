@@ -29,22 +29,27 @@ type sshClientStore struct {
 	m       sync.Mutex
 }
 
-func newSSHClientStore() *sshClientStore {
-	store := &sshClientStore{
+var (
+	store *sshClientStore
+)
+
+func InitializeSSHClientStore(ttl time.Duration) {
+	store = &sshClientStore{
 		clients: make(map[string]*storeElement),
 	}
 
 	// This go routine runs for the lifetime of the program.
 	go func() {
 		for {
-			<-time.Tick(time.Minute)
+			watchTime := time.Duration(float64(ttl.Nanoseconds()) * 0.1)
+			<-time.Tick(watchTime)
 
 			func() {
 				store.m.Lock()
 				defer store.m.Unlock()
 
 				for key, elem := range store.clients {
-					if diff := time.Now().Sub(elem.lastUsed); elem.ref == 0 && diff > time.Minute*10 {
+					if diff := time.Now().Sub(elem.lastUsed); elem.ref == 0 && diff > ttl {
 						log.Println("connection to", key, "unused for", diff, "closing")
 						elem.client.c.Close()
 						delete(store.clients, key)
@@ -53,13 +58,7 @@ func newSSHClientStore() *sshClientStore {
 			}()
 		}
 	}()
-
-	return store
 }
-
-var (
-	store = newSSHClientStore()
-)
 
 func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)

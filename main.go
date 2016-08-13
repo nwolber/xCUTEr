@@ -15,6 +15,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	scheduler "github.com/nwolber/cron"
+	"github.com/nwolber/xCUTEr/job"
 
 	_ "net/http/pprof"
 )
@@ -27,13 +28,27 @@ func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+
+	jobDir, sshTTL, logFile := config()
+
+	if logFile != "" {
+		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.SetOutput(f)
+		os.Stdout = f
+		os.Stderr = f
+	}
+
+	job.InitializeSSHClientStore(sshTTL)
 
 	mainCtx, mainCancel := context.WithCancel(context.Background())
 
 	events := make(chan fsnotify.Event)
 	w := &watcher{
-		path: ".",
+		path: jobDir,
 	}
 	go w.watch(mainCtx, events)
 
@@ -50,33 +65,15 @@ func main() {
 		select {
 		case event := <-events:
 			if event.Op&fsnotify.Create == fsnotify.Create {
-				// log.Println("Create")
 				e.Add(event.Name)
-			} else if event.Op&fsnotify.Chmod == fsnotify.Chmod {
-				// log.Println("Chmod")
 			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-				// log.Println("Remove")
 				e.Remove(event.Name)
 			} else if event.Op&fsnotify.Rename == fsnotify.Rename {
-				// log.Println("Rename")
 				e.Remove(event.Name)
 			} else if event.Op&fsnotify.Write == fsnotify.Write {
-				// log.Println("Write")
 				e.Remove(event.Name)
 				e.Add(event.Name)
 			}
-
-			// switch event.Op {
-			// case fsnotify.Create:
-			// 	e.Add(event.Name)
-			// case fsnotify.Remove:
-			// 	e.Remove(event.Name)
-			// case fsnotify.Rename:
-			// 	log.Println("rename", event.Name)
-			// case fsnotify.Chmod:
-			// 	e.Remove(event.Name)
-			// 	e.Add(event.Name)
-			// }
 
 		case s := <-signals:
 			fmt.Println("Got signal:", s)
