@@ -5,26 +5,80 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/nwolber/xCUTEr/flow"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/context"
 )
 
+type storeElement struct {
+	ref    int
+	client *sshClient
+}
+
+type sshClientStore struct {
+	clients map[string]*storeElement
+	m       sync.Mutex
+}
+
+var (
+	store = &sshClientStore{
+		clients: make(map[string]*storeElement),
+	}
+)
+
+func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
+	key := fmt.Sprintf("%s@%s", user, addr)
+
+	store.m.Lock()
+	defer store.m.Unlock()
+
+	elem, ok := store.clients[key]
+
+	if !ok {
+		client, err := createClient(addr, user)
+		if err != nil {
+			return nil, err
+		}
+
+		store.clients[key] = &storeElement{
+			ref:    1,
+			client: client,
+		}
+
+		go func(ctx context.Context, client *sshClient) {
+			<-ctx.Done()
+			store.m.Lock()
+			defer store.m.Unlock()
+
+			elem := store.clients[key]
+			elem.ref--
+
+			if elem.ref == 0 {
+				elem.client.c.Close()
+				log.Println("connection to", addr, "closed")
+				delete(store.clients, key)
+			}
+		}(ctx, client)
+
+		return client, nil
+	}
+
+	elem.ref++
+	return elem.client, nil
+}
+
 type sshClient struct {
 	c *ssh.Client
 }
 
-func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
-	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
-	}
-
+func createClient(addr, user string) (*sshClient, error) {
 	password, err := ioutil.ReadFile("password")
 	if err != nil {
 		log.Panicln(err)
@@ -46,17 +100,17 @@ func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 			ssh.PublicKeys(signer),
 		},
 	}
-	l.Println("connecting to", addr)
+	log.Println("connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return nil, err
 	}
 
-	go func() {
-		<-ctx.Done()
-		client.Close()
-	}()
-	l.Println("connected to", addr)
+	// go func() {
+	// 	<-ctx.Done()
+	// 	client.Close()
+	// }()
+	log.Println("connected to", addr)
 	return &sshClient{
 		c: client,
 	}, nil
