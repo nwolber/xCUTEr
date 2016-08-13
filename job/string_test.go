@@ -4,18 +4,15 @@
 
 package job
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestBuilderCommand(t *testing.T) {
 	s := &stringVisitor{}
-	c := s.Command(&command{Command: "first"}).(fmt.Stringer)
+	c := s.Command(&command{Command: "first"}).(Stringer)
 
 	want := "Execute \"first\""
 
-	if got := c.String(); got != want {
+	if got := c.String(nil); got != want {
 		t.Errorf("want: %q, got: %q", want, got)
 	}
 }
@@ -30,7 +27,7 @@ func TestBuilderMultiple(t *testing.T) {
 		"├─ Execute \"first\"\n" +
 		"└─ Execute \"second\""
 
-	if got := g.(fmt.Stringer).String(); got != want {
+	if got := g.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
@@ -41,7 +38,7 @@ func TestBuilderEmptyMultiple(t *testing.T) {
 
 	want := "Sequential"
 
-	if got := g.(fmt.Stringer).String(); got != want {
+	if got := g.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
@@ -61,7 +58,7 @@ func TestBuilderNested(t *testing.T) {
 		"│  └─ Execute \"third\"\n" +
 		"└─ Execute \"second\""
 
-	if got := g1.(fmt.Stringer).String(); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
@@ -79,7 +76,7 @@ func TestBuilderNested3(t *testing.T) {
 		"   ├─ Execute \"second\"\n" +
 		"   └─ Execute \"third\""
 
-	if got := g1.(fmt.Stringer).String(); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
@@ -99,7 +96,25 @@ func TestBuilderNested4(t *testing.T) {
 		"└─ Parallel\n" +
 		"   └─ Execute \"third\""
 
-	if got := g1.(fmt.Stringer).String(); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
+		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func TestMax(t *testing.T) {
+	s := &stringVisitor{}
+	g1 := s.Sequential()
+	g1.(*multiple).max = 2
+	g1.Append(s.Command(&command{Command: "first"}))
+	g1.Append(s.Command(&command{Command: "second"}))
+	g1.Append(s.Command(&command{Command: "third"}))
+
+	want := "Sequential\n" +
+		"├─ Execute \"first\"\n" +
+		"├─ Execute \"second\"\n" +
+		"└─ and 1 more ..."
+
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }

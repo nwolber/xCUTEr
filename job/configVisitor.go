@@ -32,6 +32,7 @@ type configVisitor interface {
 	HostLogger(jobName string, h *host) interface{}
 	Timeout(timeout time.Duration) interface{}
 	SCP(scp *scp) interface{}
+	Hosts() group
 	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
 	Templating(c *Config, h *host) interface{}
@@ -95,7 +96,7 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 			return nil, err
 		}
 
-		hostFluncs := builder.Parallel()
+		hostFluncs := builder.Hosts()
 		for _, host := range *hosts {
 			host, err := visitHost(builder, c, host)
 			if err != nil {
@@ -124,13 +125,6 @@ func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
 		children.Append(builder.Forwarding(f))
 	}
 
-	// cmd, err := visitCommand(builder, c.Command)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// children.Append(cmd)
-
-	// return builder.ErrorSafeguard(children.Wrap()), nil
 	return children, nil
 }
 

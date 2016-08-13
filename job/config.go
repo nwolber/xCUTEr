@@ -29,19 +29,21 @@ type Config struct {
 
 func (c *Config) String() string {
 	f, err := visitConfig(&stringVisitor{
-		full: true,
-		tt: &templatingEngine{
-			Config: c,
-			now: func() time.Time {
-				return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-			},
-		},
+		full:     true,
+		maxHosts: 1,
 	}, c)
 	if err != nil {
 		log.Panicln(err)
 	}
 
-	return f.(fmt.Stringer).String()
+	return f.(Stringer).String(&vars{
+		&templatingEngine{
+			Config: c,
+			now: func() time.Time {
+				return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+			},
+		},
+	})
 }
 
 type hostsFile struct {

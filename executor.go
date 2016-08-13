@@ -68,6 +68,9 @@ func (e *executor) Add(file string) error {
 	stop := time.Now()
 	log.Println("job preparation took", stop.Sub(start))
 
+	// log.Println("Execution tree\n", c)
+	// return nil
+
 	j := &jobInfo{
 		c:    c,
 		f:    f,

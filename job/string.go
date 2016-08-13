@@ -12,19 +12,39 @@ import (
 )
 
 type stringVisitor struct {
-	full bool
-	tt   *templatingEngine
+	full, raw             bool
+	maxHosts, maxCommands int
+}
+
+type vars struct {
+	tt *templatingEngine
+}
+
+type Stringer interface {
+	String(v *vars) string
 }
 
 type simple string
 
-func (s simple) String() string {
-	return string(s)
+func (s simple) String(v *vars) string {
+	str := string(s)
+	if v != nil && v.tt != nil {
+		newStr, err := v.tt.Interpolate(str)
+		if err == nil {
+			str = newStr
+		} else {
+			log.Println(err)
+		}
+	}
+
+	return str
 }
 
 type multiple struct {
 	typ       string
-	stringers []fmt.Stringer
+	stringers []Stringer
+	max       int
+	raw       bool
 }
 
 func (s *multiple) Append(children ...interface{}) {
@@ -33,9 +53,9 @@ func (s *multiple) Append(children ...interface{}) {
 			continue
 		}
 
-		f, ok := cc.(fmt.Stringer)
+		f, ok := cc.(Stringer)
 		if !ok {
-			log.Panicf("not a fmt.Stringer %T", cc)
+			log.Panicf("not a Stringer %T", cc)
 		}
 
 		s.stringers = append(s.stringers, f)
@@ -46,7 +66,7 @@ func (s *multiple) Wrap() interface{} {
 	return s
 }
 
-func (s *multiple) String() string {
+func (s *multiple) String(v *vars) string {
 	str := s.typ
 	l := len(s.stringers)
 
@@ -54,18 +74,32 @@ func (s *multiple) String() string {
 		return str
 	}
 
-	str += "\n"
-
-	for i := 0; i < len(s.stringers)-1; i++ {
-		sub := s.stringers[i].String()
-		sub = strings.Replace(sub, "\n", "\n│  ", -1)
-
-		str += "├─ " + sub + "\n"
+	if s.raw {
+		v = &vars{}
 	}
 
-	sub := s.stringers[l-1].String()
-	sub = strings.Replace(sub, "\n", "\n   ", -1)
-	str += "└─ " + sub
+	str += "\n"
+
+	if s.max > 0 && l > s.max {
+		for i := 0; i < s.max; i++ {
+			sub := s.stringers[i].String(v)
+			sub = strings.Replace(sub, "\n", "\n│  ", -1)
+
+			str += "├─ " + sub + "\n"
+		}
+		str += fmt.Sprintf("└─ and %d more ...", l-s.max)
+	} else {
+		for i := 0; i < l-1; i++ {
+			sub := s.stringers[i].String(v)
+			sub = strings.Replace(sub, "\n", "\n│  ", -1)
+
+			str += "├─ " + sub + "\n"
+		}
+
+		sub := s.stringers[l-1].String(v)
+		sub = strings.Replace(sub, "\n", "\n   ", -1)
+		str += "└─ " + sub
+	}
 
 	return str
 }
@@ -82,24 +116,16 @@ func (*stringVisitor) Parallel() group {
 	}
 }
 
-func (*stringVisitor) Job(name string) group {
+func (s *stringVisitor) Job(name string) group {
 	return &multiple{
 		typ: name,
+		raw: s.raw,
 	}
 }
 
 func (s *stringVisitor) Output(file string) interface{} {
 	if file == "" {
 		return nil
-	}
-
-	if s.tt != nil {
-		newFile, err := s.tt.Interpolate(file)
-		if err == nil {
-			file = newFile
-		} else {
-			log.Println(err)
-		}
 	}
 
 	return simple("Output: " + file)
@@ -127,10 +153,16 @@ func (*stringVisitor) SCP(scp *scp) interface{} {
 	return simple("SCP listen on " + scp.Addr)
 }
 
+func (s *stringVisitor) Hosts() group {
+	return &multiple{
+		typ: "Target hosts",
+		max: s.maxHosts,
+	}
+}
+
 type partHost struct {
 	*multiple
-	old *templatingEngine
-	s   *stringVisitor
+	h *host
 }
 
 func (p *partHost) Append(children ...interface{}) {
@@ -138,12 +170,21 @@ func (p *partHost) Append(children ...interface{}) {
 }
 
 func (p *partHost) Wrap() interface{} {
-	p.s.tt = p.old
-	return p.multiple.Wrap()
+	return p
 }
 
-func (p *partHost) String() string {
-	return p.multiple.String()
+func (p *partHost) String(v *vars) string {
+	vr := &vars{}
+
+	if v != nil && v.tt != nil {
+		vr.tt = &templatingEngine{
+			Config: v.tt.Config,
+			Host:   p.h,
+			now:    v.tt.now,
+		}
+	}
+
+	return p.multiple.String(vr)
 }
 
 func (s *stringVisitor) Host(c *Config, h *host) group {
@@ -159,29 +200,22 @@ func (s *stringVisitor) Host(c *Config, h *host) group {
 		multiple: &multiple{
 			typ: "Host " + name,
 		},
-		old: s.tt,
-		s:   s,
-	}
-
-	s.tt = &templatingEngine{
-		Config: s.tt.Config,
-		Host:   h,
-		now:    s.tt.now,
+		h: h,
 	}
 
 	return p
 }
 
 func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
-	stringer, ok := child.(fmt.Stringer)
+	stringer, ok := child.(Stringer)
 	if !ok {
-		log.Panicf("not a fmt.Stringer %T", child)
+		log.Panicf("not a Stringer %T", child)
 	}
 
 	if s.full {
 		return &multiple{
 			typ: "Error safeguard",
-			stringers: []fmt.Stringer{
+			stringers: []Stringer{
 				stringer,
 			},
 		}
@@ -206,25 +240,15 @@ func (*stringVisitor) Forwarding(f *forwarding) interface{} {
 
 func (s *stringVisitor) Commands(cmd *command) group {
 	return &multiple{
-		// typ: s.Command(cmd).(fmt.Stringer).String(),
 		typ: "Command",
+		max: s.maxCommands,
 	}
 }
 
 func (s *stringVisitor) Command(cmd *command) interface{} {
 	var str string
 	if cmd.Command != "" {
-		cmd := cmd.Command
-		if s.tt != nil {
-			newCmd, err := s.tt.Interpolate(cmd)
-			if err == nil {
-				cmd = newCmd
-			} else {
-				log.Println(err)
-			}
-		}
-
-		str = fmt.Sprintf("Execute %q", cmd)
+		str = fmt.Sprintf("Execute %q", cmd.Command)
 	} else {
 		str = "!!! ERROR !!!"
 	}
@@ -235,17 +259,7 @@ func (s *stringVisitor) Command(cmd *command) interface{} {
 func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 	var str string
 	if cmd.Command != "" {
-		cmd := cmd.Command
-		if s.tt != nil {
-			newCmd, err := s.tt.Interpolate(cmd)
-			if err == nil {
-				cmd = newCmd
-			} else {
-				log.Println(err)
-			}
-		}
-
-		str = fmt.Sprintf("Execute %q locally", cmd)
+		str = fmt.Sprintf("Execute %q locally", cmd.Command)
 	} else {
 		str = "!!! ERROR !!!"
 	}
@@ -254,27 +268,9 @@ func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 }
 
 func (s *stringVisitor) Stdout(file string) interface{} {
-	if s.tt != nil {
-		newFile, err := s.tt.Interpolate(file)
-		if err == nil {
-			file = newFile
-		} else {
-			log.Println(err)
-		}
-	}
-
 	return simple("Redirect STDOUT to " + file)
 }
 
 func (s *stringVisitor) Stderr(file string) interface{} {
-	if s.tt != nil {
-		newFile, err := s.tt.Interpolate(file)
-		if err == nil {
-			file = newFile
-		} else {
-			log.Println(err)
-		}
-	}
-
 	return simple("Redirect STDERR to " + file)
 }

@@ -169,6 +169,10 @@ func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
 	})
 }
 
+func (e *executionTreeVisitor) Hosts() group {
+	return e.Parallel()
+}
+
 func (e *executionTreeVisitor) Host(c *Config, h *host) group {
 	return e.Sequential()
 }
