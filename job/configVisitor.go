@@ -74,12 +74,18 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 		children.Append(builder.SCP(c.SCP))
 	}
 
+	cmd, err := visitCommand(builder, c.Command)
+	if err != nil {
+		return nil, err
+	}
+
 	if c.Host != nil {
 		host, err := visitHost(builder, c, c.Host)
 		if err != nil {
 			return nil, err
 		}
-		children.Append(host)
+		host.Append(cmd)
+		children.Append(builder.ErrorSafeguard(host.Wrap()))
 	}
 
 	if c.HostsFile != nil {
@@ -94,7 +100,8 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			hostFluncs.Append(host)
+			host.Append(cmd)
+			hostFluncs.Append(builder.ErrorSafeguard(host.Wrap()))
 		}
 		children.Append(hostFluncs.Wrap())
 	}
@@ -102,7 +109,7 @@ func visitConfig(builder configVisitor, c *config) (interface{}, error) {
 	return children.Wrap(), nil
 }
 
-func visitHost(builder configVisitor, c *config, host *host) (interface{}, error) {
+func visitHost(builder configVisitor, c *config, host *host) (group, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
@@ -116,13 +123,14 @@ func visitHost(builder configVisitor, c *config, host *host) (interface{}, error
 		children.Append(builder.Forwarding(f))
 	}
 
-	cmd, err := visitCommand(builder, c.Command)
-	if err != nil {
-		return nil, err
-	}
-	children.Append(cmd)
+	// cmd, err := visitCommand(builder, c.Command)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// children.Append(cmd)
 
-	return builder.ErrorSafeguard(children.Wrap()), nil
+	// return builder.ErrorSafeguard(children.Wrap()), nil
+	return children, nil
 }
 
 func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
