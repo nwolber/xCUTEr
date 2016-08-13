@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/fsnotify/fsnotify"
-	scheduler "github.com/nwolber/cron"
 	"github.com/nwolber/xCUTEr/job"
 
 	_ "net/http/pprof"
@@ -52,13 +51,7 @@ func main() {
 	}
 	go w.watch(mainCtx, events)
 
-	e := &executor{
-		mainCtx:   mainCtx,
-		cron:      scheduler.New(),
-		scheduled: make(map[string]*schedInfo),
-		running:   make(map[string]*runInfo),
-	}
-
+	e := newExecutor(mainCtx)
 	e.cron.Start()
 
 	for {

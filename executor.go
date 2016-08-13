@@ -45,14 +45,28 @@ func (info *runInfo) run() {
 }
 
 type executor struct {
-	mainCtx context.Context
-	cron    *scheduler.Cron
+	mainCtx     context.Context
+	cron        *scheduler.Cron
+	addInactive bool
+
+	inactive  map[string]*schedInfo
+	mInactive sync.Mutex
 
 	scheduled map[string]*schedInfo
 	mSched    sync.Mutex
 
 	running map[string]*runInfo
 	mRun    sync.Mutex
+}
+
+func newExecutor(ctx context.Context) *executor {
+	return &executor{
+		mainCtx:   ctx,
+		cron:      scheduler.New(),
+		inactive:  make(map[string]*schedInfo),
+		scheduled: make(map[string]*schedInfo),
+		running:   make(map[string]*runInfo),
+	}
 }
 
 func (e *executor) Add(file string) error {
@@ -84,6 +98,12 @@ func (e *executor) Add(file string) error {
 		}
 		j.run()
 	} else {
+		if e.addInactive {
+			e.append(&schedInfo{
+				j: j,
+			})
+			return nil
+		}
 
 		id, err := e.cron.AddFunc(c.Schedule, func() {
 			log.Println(j.c.Name, "woke up")
@@ -130,6 +150,7 @@ func (e *executor) Remove(file string) {
 	}
 }
 
+// Start runs a job.
 func (e *executor) start(info *runInfo) {
 	e.mRun.Lock()
 	defer e.mRun.Unlock()
@@ -137,6 +158,7 @@ func (e *executor) start(info *runInfo) {
 	e.running[info.j.file] = info
 }
 
+// Stop halts execution of a job.
 func (e *executor) stop(info *runInfo) {
 	e.mRun.Lock()
 	defer e.mRun.Unlock()
@@ -144,6 +166,7 @@ func (e *executor) stop(info *runInfo) {
 	delete(e.running, info.j.file)
 }
 
+// GetRunning returns a runInfo, if there is a running job.
 func (e *executor) getRunning(file string) *runInfo {
 	e.mRun.Lock()
 	defer e.mRun.Unlock()
@@ -170,4 +193,25 @@ func (e *executor) getScheduled(file string) *schedInfo {
 	defer e.mSched.Unlock()
 
 	return e.scheduled[file]
+}
+
+func (e *executor) append(info *schedInfo) {
+	e.mInactive.Lock()
+	defer e.mInactive.Unlock()
+
+	e.inactive[info.j.file] = info
+}
+
+func (e *executor) drop(info *schedInfo) {
+	e.mInactive.Lock()
+	defer e.mInactive.Unlock()
+
+	delete(e.inactive, info.j.file)
+}
+
+func (e *executor) getInactive(file string) *schedInfo {
+	e.mInactive.Lock()
+	defer e.mInactive.Unlock()
+
+	return e.inactive[file]
 }
