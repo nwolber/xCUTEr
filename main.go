@@ -52,7 +52,7 @@ func main() {
 	go w.watch(mainCtx, events)
 
 	e := newExecutor(mainCtx)
-	e.cron.Start()
+	e.Start()
 
 	for {
 		select {
@@ -79,9 +79,9 @@ func main() {
 
 		case s := <-signals:
 			fmt.Println("Got signal:", s)
-			e.cron.Stop()
+			e.Stop()
 			mainCancel()
-			return
+			break
 		}
 	}
 

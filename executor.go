@@ -20,8 +20,7 @@ type scheduler interface {
 	Stop()
 	Start()
 	AddFunc(spec string, cmd func()) (string, error)
-	Entries() []*sched.Entry
-	Remove(entry *sched.Entry)
+	Remove(id string)
 }
 
 type jobInfo struct {
@@ -64,11 +63,12 @@ func (info *runInfo) run() {
 
 type executor struct {
 	mainCtx      context.Context
-	cron         scheduler
 	manualActive bool
 	maxCompleted int
+	Start, Stop  func()
 	run          func(info *runInfo)
 	schedule     func(schedule string, f func()) (string, error)
+	remove       func(string)
 
 	inactive  map[string]*schedInfo
 	mInactive sync.Mutex
@@ -89,10 +89,12 @@ func newExecutor(ctx context.Context) *executor {
 	cron := sched.New()
 	return &executor{
 		mainCtx:      ctx,
-		cron:         cron,
 		maxCompleted: 10,
+		Start:        cron.Start,
+		Stop:         cron.Stop,
 		run:          run,
 		schedule:     cron.AddFunc,
+		remove:       cron.Remove,
 		inactive:     make(map[string]*schedInfo),
 		scheduled:    make(map[string]*schedInfo),
 		running:      make(map[string]*runInfo),
@@ -170,11 +172,7 @@ func (e *executor) Remove(file string) {
 
 	if info := e.getScheduled(file); info != nil {
 		e.removeScheduled(info)
-		for _, entry := range e.cron.Entries() {
-			if entry.ID == info.id {
-				e.cron.Remove(entry)
-			}
-		}
+		e.remove(info.id)
 
 		log.Println("found scheduled", info.j.c.Name)
 	}

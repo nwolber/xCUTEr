@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -222,10 +223,32 @@ func TestAddSchedule(t *testing.T) {
 	expectExecutor(t, e, "done", 0, 1, 0, 1)
 }
 
+func TestAddScheduleError(t *testing.T) {
+	const (
+		file = "test.job"
+	)
+
+	e := newExecutor(context.Background())
+	e.schedule = func(schedule string, f func()) (string, error) {
+		return "", errors.New("test error")
+	}
+
+	j := &jobInfo{
+		file: file,
+		c: &job.Config{
+			Name: "Test Job",
+		},
+	}
+	if err := e.Add(j); err == nil {
+		t.Error("expected error, got nil")
+	}
+
+	expectExecutor(t, e, "after", 0, 0, 0, 0)
+}
+
 func TestRemoveBeforeWake(t *testing.T) {
 	const (
-		file         = "test.job"
-		wantSchedule = "@every 10s"
+		file = "test.job"
 	)
 
 	waitBeforeWake := make(chan struct{})
@@ -240,8 +263,7 @@ func TestRemoveBeforeWake(t *testing.T) {
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
-			Name:     "Test Job",
-			Schedule: wantSchedule,
+			Name: "Test Job",
 		},
 	}
 	e.Add(j)
@@ -255,8 +277,7 @@ func TestRemoveBeforeWake(t *testing.T) {
 
 func TestRemoveWhileRunning(t *testing.T) {
 	const (
-		file         = "test.job"
-		wantSchedule = "@every 10s"
+		file = "test.job"
 	)
 
 	waitBeforeWake := make(chan struct{})
@@ -274,8 +295,7 @@ func TestRemoveWhileRunning(t *testing.T) {
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
-			Name:     "Test Job",
-			Schedule: wantSchedule,
+			Name: "Test Job",
 		},
 		f: func(ctx context.Context) (context.Context, error) {
 			done <- struct{}{}
@@ -302,8 +322,7 @@ func TestRemoveWhileRunning(t *testing.T) {
 
 func TestRemoveAfterDone(t *testing.T) {
 	const (
-		file         = "test.job"
-		wantSchedule = "@every 10s"
+		file = "test.job"
 	)
 
 	waitBeforeWake := make(chan struct{})
@@ -321,8 +340,7 @@ func TestRemoveAfterDone(t *testing.T) {
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
-			Name:     "Test Job",
-			Schedule: wantSchedule,
+			Name: "Test Job",
 		},
 		f: func(ctx context.Context) (context.Context, error) {
 			done <- struct{}{}
@@ -359,8 +377,7 @@ func TestRemoveAfterDone(t *testing.T) {
 
 func TestAddInactive(t *testing.T) {
 	const (
-		file         = "test.job"
-		wantSchedule = "@every 10s"
+		file = "test.job"
 	)
 
 	waitBeforeWake := make(chan struct{})
@@ -374,8 +391,7 @@ func TestAddInactive(t *testing.T) {
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
-			Name:     "Test Job",
-			Schedule: wantSchedule,
+			Name: "Test Job",
 		},
 	}
 	e.Add(j)
@@ -385,8 +401,7 @@ func TestAddInactive(t *testing.T) {
 
 func TestRemoveInactive(t *testing.T) {
 	const (
-		file         = "test.job"
-		wantSchedule = "@every 10s"
+		file = "test.job"
 	)
 
 	waitBeforeWake := make(chan struct{})
@@ -400,8 +415,7 @@ func TestRemoveInactive(t *testing.T) {
 	j := &jobInfo{
 		file: file,
 		c: &job.Config{
-			Name:     "Test Job",
-			Schedule: wantSchedule,
+			Name: "Test Job",
 		},
 	}
 	e.Add(j)
