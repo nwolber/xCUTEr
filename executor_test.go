@@ -1,4 +1,8 @@
-package main
+// Copyright (c) 2016 Niklas Wolber
+// This file is licensed under the MIT license.
+// See the LICENSE file for more information.
+
+package xCUTEr
 
 import (
 	"errors"
@@ -143,7 +147,7 @@ func TestRunTwice(t *testing.T) {
 func TestMaxCompleted(t *testing.T) {
 	e := newExecutor(context.Background())
 	want := 2
-	e.maxCompleted = want
+	e.maxCompleted = uint32(want)
 
 	done := make(chan struct{})
 	j := &jobInfo{
