@@ -97,6 +97,8 @@ func (s *stringVisitor) Output(file string) interface{} {
 		newFile, err := s.tt.Interpolate(file)
 		if err == nil {
 			file = newFile
+		} else {
+			log.Println(err)
 		}
 	}
 
@@ -125,10 +127,41 @@ func (*stringVisitor) SCP(scp *scp) interface{} {
 	return simple("SCP listen on " + scp.Addr)
 }
 
-func (*stringVisitor) Host(c *config, h *host) group {
-	return &multiple{
-		typ: "Host " + h.Addr,
+type partHost struct {
+	*multiple
+	old *templatingEngine
+	s   *stringVisitor
+}
+
+func (p *partHost) Append(children ...interface{}) {
+	p.multiple.Append(children...)
+}
+
+func (p *partHost) Wrap() interface{} {
+	p.s.tt = p.old
+	return p.multiple.Wrap()
+}
+
+func (p *partHost) String() string {
+	return p.multiple.String()
+}
+
+func (s *stringVisitor) Host(c *config, h *host) group {
+	p := &partHost{
+		multiple: &multiple{
+			typ: "Host " + h.Addr,
+		},
+		old: s.tt,
+		s:   s,
 	}
+
+	s.tt = &templatingEngine{
+		Config: s.tt.Config,
+		Host:   h,
+		now:    s.tt.now,
+	}
+
+	return p
 }
 
 func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
@@ -170,10 +203,20 @@ func (s *stringVisitor) Commands(cmd *command) group {
 	}
 }
 
-func (*stringVisitor) Command(cmd *command) interface{} {
+func (s *stringVisitor) Command(cmd *command) interface{} {
 	var str string
 	if cmd.Command != "" {
-		str = fmt.Sprintf("Execute %q", cmd.Command)
+		cmd := cmd.Command
+		if s.tt != nil {
+			newCmd, err := s.tt.Interpolate(cmd)
+			if err == nil {
+				cmd = newCmd
+			} else {
+				log.Println(err)
+			}
+		}
+
+		str = fmt.Sprintf("Execute %q", cmd)
 	} else {
 		str = "!!! ERROR !!!"
 	}
@@ -181,10 +224,28 @@ func (*stringVisitor) Command(cmd *command) interface{} {
 	return simple(str)
 }
 
-func (*stringVisitor) Stdout(file string) interface{} {
+func (s *stringVisitor) Stdout(file string) interface{} {
+	if s.tt != nil {
+		newFile, err := s.tt.Interpolate(file)
+		if err == nil {
+			file = newFile
+		} else {
+			log.Println(err)
+		}
+	}
+
 	return simple("Redirect STDOUT to " + file)
 }
 
-func (*stringVisitor) Stderr(file string) interface{} {
+func (s *stringVisitor) Stderr(file string) interface{} {
+	if s.tt != nil {
+		newFile, err := s.tt.Interpolate(file)
+		if err == nil {
+			file = newFile
+		} else {
+			log.Println(err)
+		}
+	}
+
 	return simple("Redirect STDERR to " + file)
 }
