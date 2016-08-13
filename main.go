@@ -47,8 +47,11 @@ func main() {
 
 	log.Printf("Execution tree:\n%s", conf)
 
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
 	exec := func() {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(mainCtx)
 		ctx = context.WithValue(ctx, outputKey, os.Stdout)
 		defer cancel()
 
@@ -61,17 +64,25 @@ func main() {
 			log.Println("execution complete")
 		}
 		log.Println("execution took", stop.Sub(start))
+
 	}
 
 	if conf.Schedule == "once" {
-		exec()
+		go func() {
+			exec()
+			close(done)
+		}()
 	} else {
 		cron.AddFunc(conf.Schedule, exec)
 		cron.Start()
 		defer cron.Stop()
 	}
-	s := <-signals
-	fmt.Println("Got signal:", s)
+	select {
+	case <-done:
+	case s := <-signals:
+		fmt.Println("Got signal:", s)
+	}
+	mainCancel()
 
 	log.Println("fin")
 }

@@ -72,7 +72,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string) error {
 				}
 				l.Println("accepted new connection")
 
-				handleSSHConnection(ctx, conn, config)
+				go handleSSHConnection(ctx, conn, config)
 
 			case <-ctx.Done():
 				return
