@@ -33,6 +33,8 @@ var (
 	store *sshClientStore
 )
 
+// InitializeSSHClientStore initialies the global SSH connection store and
+// sets the time-to-live for unused connections.
 func InitializeSSHClientStore(ttl time.Duration) {
 	store = &sshClientStore{
 		clients: make(map[string]*storeElement),

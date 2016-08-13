@@ -19,7 +19,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-func ExecutionTree(c *Config) (flunc.Flunc, error) {
+// ExecutionTree creates the execution tree necessary to executeCommand
+// the configured steps.
+func (c *Config) ExecutionTree() (flunc.Flunc, error) {
 	f, err := visitConfig(&executionTreeVisitor{}, c)
 	if err != nil {
 		return nil, err

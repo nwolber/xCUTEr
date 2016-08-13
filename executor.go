@@ -126,7 +126,7 @@ func parse(file string) (*jobInfo, error) {
 	}
 
 	start := time.Now()
-	f, err := job.ExecutionTree(c)
+	f, err := c.ExecutionTree()
 	stop := time.Now()
 	log.Println("job preparation took", stop.Sub(start))
 

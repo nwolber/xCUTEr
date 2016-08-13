@@ -15,6 +15,7 @@ import (
 
 type hostConfig map[string]*host
 
+// Config is the in-memory representation of a job configuration.
 type Config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
@@ -28,9 +29,18 @@ type Config struct {
 }
 
 func (c *Config) String() string {
+	return c.Tree(true, false, 1, 0)
+}
+
+// Tree returns a textual representation of the Config's execution tree.
+// When full is true, housekeeping steps are included. When raw is true,
+// template string are output in the un-interpolated form.
+func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 	f, err := visitConfig(&stringVisitor{
-		full:     true,
-		maxHosts: 1,
+		full:        full,
+		raw:         raw,
+		maxHosts:    maxHosts,
+		maxCommands: maxCommands,
 	}, c)
 	if err != nil {
 		log.Panicln(err)
@@ -44,6 +54,16 @@ func (c *Config) String() string {
 			},
 		},
 	})
+}
+
+// JSON generates the Config's JSON representation.
+func (c *Config) JSON() string {
+	b, err := json.Marshal(c)
+	if err != nil {
+		log.Println("error marshalling config", err)
+		return ""
+	}
+	return string(b)
 }
 
 type hostsFile struct {
@@ -86,6 +106,7 @@ func (c *command) String() string {
 	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q")
 }
 
+// ReadConfig parses the file into a Config.
 func ReadConfig(file string) (*Config, error) {
 	var c Config
 
