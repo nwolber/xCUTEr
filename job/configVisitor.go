@@ -39,6 +39,7 @@ type configVisitor interface {
 	Forwarding(f *forwarding) interface{}
 	Commands(cmd *command) group
 	Command(cmd *command) interface{}
+	LocalCommand(cmd *command) interface{}
 	Stdout(file string) interface{}
 	Stderr(file string) interface{}
 }
@@ -163,7 +164,11 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 	var cmds interface{}
 
 	if cmd.Command != "" {
-		cmds = builder.Command(cmd)
+		if cmd.Target == "local" {
+			cmds = builder.LocalCommand(cmd)
+		} else {
+			cmds = builder.Command(cmd)
+		}
 	} else if cmd.Commands != nil && len(cmd.Commands) > 0 {
 		var childCommands group
 

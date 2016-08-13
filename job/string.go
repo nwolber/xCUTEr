@@ -232,6 +232,27 @@ func (s *stringVisitor) Command(cmd *command) interface{} {
 	return simple(str)
 }
 
+func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
+	var str string
+	if cmd.Command != "" {
+		cmd := cmd.Command
+		if s.tt != nil {
+			newCmd, err := s.tt.Interpolate(cmd)
+			if err == nil {
+				cmd = newCmd
+			} else {
+				log.Println(err)
+			}
+		}
+
+		str = fmt.Sprintf("Execute %q locally", cmd)
+	} else {
+		str = "!!! ERROR !!!"
+	}
+
+	return simple(str)
+}
+
 func (s *stringVisitor) Stdout(file string) interface{} {
 	if s.tt != nil {
 		newFile, err := s.tt.Interpolate(file)

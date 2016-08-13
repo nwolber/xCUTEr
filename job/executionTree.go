@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/nwolber/xCUTEr/flunc"
@@ -280,6 +282,63 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 		stderr, _ := ctx.Value(stderrKey).(io.Writer)
 		err = s.executeCommand(ctx, command, stdout, stderr)
 		return nil, err
+	})
+}
+
+func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		if !ok {
+			err := fmt.Errorf("no %s available", templatingKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		command, err := tt.Interpolate(cmd.Command)
+		if err != nil {
+			l.Println("error parsing template string", cmd.Command, err)
+			return nil, err
+		}
+
+		parts := strings.Split(command, " ")
+		exe := parts[0]
+		args := parts[1:]
+
+		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+
+		processTerminated := make(chan error)
+		cmd := exec.Command(exe, args...)
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+
+		go func(cmd *exec.Cmd, c chan<- error) {
+			if err := cmd.Run(); err != nil {
+				l.Println("error running", exe, err)
+
+				// TODO get exit code from err.(*exec.ExitStatus)
+				c <- err
+			} else {
+				l.Println(exe, "completed successfully")
+				c <- nil
+			}
+		}(cmd, processTerminated)
+
+		select {
+		case err = <-processTerminated:
+			return nil, err
+		case <-ctx.Done():
+			l.Println("context completed, killing process")
+			cmd.Process.Kill()
+		}
+		return nil, nil
 	})
 }
 

@@ -74,7 +74,8 @@ type command struct {
 	Name     string     `json:"name,omitempty"`
 	Command  string     `json:"command,omitempty"`
 	Commands []*command `json:"commands,omitempty`
-	Flow     string     `json:"flow,omit"`
+	Flow     string     `json:"flow,omitempty"`
+	Target   string     `json:"target,omitempty"`
 	Stdout   string     `json:"stdout,omitempty"`
 	Stderr   string     `json:"stderr,omitempty"`
 }
