@@ -1,4 +1,4 @@
-# xCUTEr - *Common Utility & Transfer Engine*
+# xCUTEr
 
 xCUTEr is a tool to run commands on a list of servers.
 It watches a directory for job definition files and executes them.
