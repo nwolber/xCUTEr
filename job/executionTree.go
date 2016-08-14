@@ -174,8 +174,9 @@ func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
 			return nil, err
 		}
 
-		l.Println("setting up scp on", scp.Addr)
-		doSCP(ctx, b, scp.Addr)
+		addr := fmt.Sprintf("%s:%d", scp.Addr, scp.Port)
+		l.Println("setting up scp on", addr)
+		doSCP(ctx, b, addr)
 		return nil, nil
 	})
 }

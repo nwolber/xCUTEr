@@ -150,7 +150,7 @@ func (*stringVisitor) Timeout(timeout time.Duration) interface{} {
 }
 
 func (*stringVisitor) SCP(scp *scp) interface{} {
-	return simple("SCP listen on " + scp.Addr)
+	return simple(fmt.Sprintf("SCP listen on %s:%d", scp.Addr, scp.Port))
 }
 
 func (s *stringVisitor) Hosts() group {
