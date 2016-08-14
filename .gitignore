@@ -1,5 +1,4 @@
 .DS_store
-xCUTEr
 *.txt
 *.html
 *.json
@@ -7,3 +6,4 @@ xCUTEr
 *.job
 id_rsa*
 password
+cmd/xCUTER/xCUTER
