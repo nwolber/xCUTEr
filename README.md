@@ -157,7 +157,7 @@ Timeout when the job is canceled, if it didn't complete. Documentation on the fo
 ```
 
 ##### Output
-File where to redirect STDOUT and STDERR of the job. Supports *templating*.
+File where to redirect STDOUT and STDERR of the job. Supports *[templating](#templating)*.
 ```json
 "output": "logfile"
 ```
@@ -235,12 +235,12 @@ A command es executed on the host defined by either `host` or `hosts`.
 }
 ```
 * name: Display name for the command. Has no further meaning.
-* command: The command to execute. Has to be empty if `commands`is present. Supports *templating*.
+* command: The command to execute. Has to be empty if `commands`is present. Supports *[templating](#templating)*.
 * commands: Array of subcommands.
 * flow: How to execute subcommands. Either `sequential`, one after the other, or `parallel` all at once. Only meaningful together with `commands`.
 * target: Where to execute the command. Either empty for hosts or `local` to execute on the machine xCUTEr is running on.
-* stdout: File where to redirect STDOUT of the command and subcommands. Supports *templating*.
-* stderr: File where to redirect STDERR of the command and subcommands. May be the same as `stdout`. Supports *templating*.
+* stdout: File where to redirect STDOUT of the command and subcommands. Supports *[templating](#templating)*.
+* stderr: File where to redirect STDERR of the command and subcommands. May be the same as `stdout`. Supports *[templating](#templating)*.
 
 #### Templating
 
