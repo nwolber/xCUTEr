@@ -89,7 +89,7 @@ type forwarding struct {
 
 type scp struct {
 	Addr string `json:"addr,omitempty"`
-	Port string `json:"port,omitempty"`
+	Port uint   `json:"port,omitempty"`
 	Key  string `json:"key,omitempty"`
 }
 
