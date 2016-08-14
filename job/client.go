@@ -7,7 +7,6 @@ package job
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"sync"
@@ -62,7 +61,7 @@ func InitializeSSHClientStore(ttl time.Duration) {
 	}()
 }
 
-func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
+func newSSHClient(ctx context.Context, addr, user, keyFile, password string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)
 
 	store.m.Lock()
@@ -71,7 +70,7 @@ func newSSHClient(ctx context.Context, addr, user string) (*sshClient, error) {
 	elem, ok := store.clients[key]
 
 	if !ok {
-		client, err := createClient(addr, user)
+		client, err := createClient(addr, user, keyFile, password)
 		if err != nil {
 			return nil, err
 		}
@@ -100,38 +99,40 @@ type sshClient struct {
 	c *ssh.Client
 }
 
-func createClient(addr, user string) (*sshClient, error) {
-	password, err := ioutil.ReadFile("password")
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	s, _, err := readPrivateKeyFile("/Users/niklas/.ssh/niklas", password)
-	if err != nil {
-		log.Fatalln("Unable to read private key", err)
-	}
-
-	signer, err := ssh.NewSignerFromSigner(s)
-	if err != nil {
-		log.Fatalln("Unable to turn signer into signer", err)
-	}
+func createClient(addr, user, keyFile, password string) (*sshClient, error) {
 
 	config := &ssh.ClientConfig{
 		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
+		Auth: []ssh.AuthMethod{},
 	}
+
+	if keyFile != "" {
+		s, _, err := readPrivateKeyFile(keyFile, nil)
+		if err != nil {
+			err = fmt.Errorf("Unable to read private key %s", err)
+			log.Println(err)
+			return nil, err
+		}
+
+		signer, err := ssh.NewSignerFromSigner(s)
+		if err != nil {
+			fmt.Errorf("Unable to turn signer into signer %s", err)
+			log.Println(err)
+			return nil, err
+		}
+		config.Auth = append(config.Auth, ssh.PublicKeys(signer))
+	}
+
+	if password != "" {
+		config.Auth = append(config.Auth, ssh.Password(password))
+	}
+
 	log.Println("connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return nil, err
 	}
 
-	// go func() {
-	// 	<-ctx.Done()
-	// 	client.Close()
-	// }()
 	log.Println("connected to", addr)
 	return &sshClient{
 		c: client,

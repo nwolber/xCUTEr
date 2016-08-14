@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	pemBlockCertificate = "CERTIFICATE"
-	pemBlockPrivateKey  = "PRIVATE KEY"
+	pemBlockPrivateKey = "PRIVATE KEY"
 )
 
 func readPrivateKeyFile(keyFile string, password []byte) (crypto.Signer, []byte, error) {
@@ -40,7 +39,7 @@ func readPrivateKeyFile(keyFile string, password []byte) (crypto.Signer, []byte,
 	case crypto.Signer:
 		return k, block.Bytes, nil
 	default:
-		return nil, []byte{}, errors.New("Private key is no valid crypto.Signer")
+		return nil, []byte{}, errors.New("private key is no valid crypto.Signer")
 	}
 }
 

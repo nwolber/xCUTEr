@@ -230,7 +230,7 @@ func (s *stringVisitor) Templating(c *Config, h *host) interface{} {
 	return nil
 }
 
-func (*stringVisitor) SSHClient(host, user string) interface{} {
+func (*stringVisitor) SSHClient(host, user, keyFile, password string) interface{} {
 	return simple(fmt.Sprintf("Open SSH connection to %s@%s", user, host))
 }
 

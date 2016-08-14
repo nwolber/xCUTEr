@@ -36,7 +36,7 @@ type configVisitor interface {
 	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
 	Templating(c *Config, h *host) interface{}
-	SSHClient(host, user string) interface{}
+	SSHClient(host, user, keyFile, password string) interface{}
 	Forwarding(f *forwarding) interface{}
 	Commands(cmd *command) group
 	Command(cmd *command) interface{}
@@ -119,7 +119,7 @@ func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
 	children := builder.Host(c, host)
 	children.Append(builder.HostLogger(c.Name, host))
 	children.Append(builder.Templating(c, host))
-	children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port), host.User))
+	children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port), host.User, host.PrivateKey, host.Password))
 
 	if f := c.Forwarding; f != nil {
 		children.Append(builder.Forwarding(f))
