@@ -28,11 +28,11 @@ func main() {
 	x.Start()
 
 	select {
+	case <-x.Done:
 	case s := <-signals:
 		fmt.Println("Got signal:", s)
 		x.Stop()
 		x.Cancel()
-		break
 	}
 
 	log.Println("fin")
