@@ -5,6 +5,7 @@
 package job
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -27,6 +28,10 @@ type sshClientStore struct {
 	clients map[string]*storeElement
 	m       sync.Mutex
 }
+
+var (
+	errUnknownUser = errors.New("keyboard interactive: unknown user")
+)
 
 var (
 	store *sshClientStore
@@ -61,7 +66,7 @@ func InitializeSSHClientStore(ttl time.Duration) {
 	}()
 }
 
-func newSSHClient(ctx context.Context, addr, user, keyFile, password string) (*sshClient, error) {
+func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)
 
 	store.m.Lock()
@@ -70,7 +75,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string) (*s
 	elem, ok := store.clients[key]
 
 	if !ok {
-		client, err := createClient(addr, user, keyFile, password)
+		client, err := createClient(addr, user, keyFile, password, keyboardInteractive)
 		if err != nil {
 			return nil, err
 		}
@@ -99,8 +104,7 @@ type sshClient struct {
 	c *ssh.Client
 }
 
-func createClient(addr, user, keyFile, password string) (*sshClient, error) {
-
+func createClient(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{},
@@ -127,6 +131,10 @@ func createClient(addr, user, keyFile, password string) (*sshClient, error) {
 		config.Auth = append(config.Auth, ssh.Password(password))
 	}
 
+	if keyboardInteractive != nil && len(keyboardInteractive) > 0 {
+		config.Auth = append(config.Auth, ssh.KeyboardInteractive(keyboardInteractiveChallenge(user, keyboardInteractive)))
+	}
+
 	log.Println("connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
@@ -137,6 +145,27 @@ func createClient(addr, user, keyFile, password string) (*sshClient, error) {
 	return &sshClient{
 		c: client,
 	}, nil
+}
+
+func keyboardInteractiveChallenge(user string, keyboardInteractive map[string]string) ssh.KeyboardInteractiveChallenge {
+	return func(challengeUser, instruction string, questions []string, echos []bool) ([]string, error) {
+		if user != challengeUser {
+			return nil, errUnknownUser
+		}
+
+		if len(questions) == 0 {
+			return nil, nil
+		}
+
+		var answers []string
+		for _, question := range questions {
+			if answer, ok := keyboardInteractive[question]; ok {
+				answers = append(answers, answer)
+			}
+		}
+
+		return answers, nil
+	}
 }
 
 func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {

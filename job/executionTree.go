@@ -219,7 +219,7 @@ func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string) interface{} {
+func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
@@ -229,7 +229,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string) int
 		}
 
 		l.Println("connecting to ", host)
-		s, err := newSSHClient(ctx, host, user, keyFile, password)
+		s, err := newSSHClient(ctx, host, user, keyFile, password, keyboardInteractive)
 		if err != nil {
 			l.Println("ssh client setup failed", err)
 			return nil, err

@@ -72,12 +72,13 @@ type hostsFile struct {
 }
 
 type host struct {
-	Name       string `json:"name,omitempty"`
-	Addr       string `json:"addr,omitempty"`
-	Port       uint   `json:"port,omitempty"`
-	User       string `json:"user,omitempty"`
-	PrivateKey string `json:"privateKey,omitempty"`
-	Password   string `json:"password,omitempty"`
+	Name                string            `json:"name,omitempty"`
+	Addr                string            `json:"addr,omitempty"`
+	Port                uint              `json:"port,omitempty"`
+	User                string            `json:"user,omitempty"`
+	PrivateKey          string            `json:"privateKey,omitempty"`
+	Password            string            `json:"password,omitempty"`
+	KeyboardInteractive map[string]string `json:"keyboardInteractive,omitempty"`
 }
 
 type forwarding struct {
