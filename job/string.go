@@ -149,7 +149,7 @@ func (*stringVisitor) Timeout(timeout time.Duration) interface{} {
 	return simple(fmt.Sprint("Timeout: ", timeout))
 }
 
-func (*stringVisitor) SCP(scp *scp) interface{} {
+func (*stringVisitor) SCP(scp *scpData) interface{} {
 	return simple(fmt.Sprintf("SCP listen on %s:%d", scp.Addr, scp.Port))
 }
 

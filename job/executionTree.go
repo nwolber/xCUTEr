@@ -159,7 +159,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
+func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {

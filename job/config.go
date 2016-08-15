@@ -25,7 +25,7 @@ type Config struct {
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
 	Command    *command    `json:"command,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
-	SCP        *scp        `json:"scp,omitempty"`
+	SCP        *scpData    `json:"scp,omitempty"`
 }
 
 func (c *Config) String() string {
@@ -87,7 +87,7 @@ type forwarding struct {
 	LocalPort  uint16 `json:"localPort,omitempty"`
 }
 
-type scp struct {
+type scpData struct {
 	Addr string `json:"addr,omitempty"`
 	Port uint   `json:"port,omitempty"`
 	Key  string `json:"key,omitempty"`

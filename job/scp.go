@@ -8,14 +8,18 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/nwolber/xCUTEr/scp"
+
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/context"
+	// "golang.org/x/net/context"
 )
 
 func doSCP(ctx context.Context, privateKey []byte, addr string) error {
@@ -148,6 +152,11 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 }
 
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
+	oldSCP(ctx, channel, req)
+	// newSCP(ctx, channel, req)
+}
+
+func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
 	defer channel.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
@@ -170,9 +179,53 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 	default:
 	}
 
+	exitCode := 0
+	err := scp.New(string(req.Payload[4:]), channel, channel)
+	if err != nil {
+		l.Println("error during scp transfer", err)
+		exitCode = 1
+	}
+
+	var buf bytes.Buffer
+	if err := binary.Write(&buf, binary.BigEndian, int32(exitCode)); err != nil {
+		l.Println("unable to convert int32 to byte")
+		return
+	}
+	channel.SendRequest("exit-status", false, buf.Bytes())
+}
+
+func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
+	defer channel.Close()
+
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
+	parts := strings.Split(string(req.Payload), " ")
+	exe := parts[0][4:]
+
+	if exe != "scp" {
+		l.Println("remote requested", exe, "denying")
+		req.Reply(false, nil)
+		return
+	}
+
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	log.Println("!!!!!!!!!!!!!!!!!!!!", string(req.Payload))
+
 	cmd := exec.Command(exe, parts[1:]...)
-	cmd.Stdin = channel
-	cmd.Stdout = channel
+	// cmd.Stdin = channel
+	// cmd.Stdout = channel
+	var input bytes.Buffer
+	var output bytes.Buffer
+	cmd.Stdin = io.TeeReader(channel, &bla{dir: "input"})
+	cmd.Stdout = io.MultiWriter(channel, &bla{dir: "output"})
 
 	processTerminated := make(chan int)
 
@@ -197,10 +250,22 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 		exitCode = 255
 	}
 
+	log.Printf("!!!!!!!!!!!!!!!!!!!! input: %q", input.String())
+	log.Printf("!!!!!!!!!!!!!!!!!!!! output: %q", output.String())
+
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.BigEndian, int32(exitCode)); err != nil {
 		l.Println("unable to convert int32 to byte")
 		return
 	}
 	channel.SendRequest("exit-status", false, buf.Bytes())
+}
+
+type bla struct {
+	dir string
+}
+
+func (x *bla) Write(b []byte) (int, error) {
+	log.Printf("!!!!!!!!!!!!!!!!!!!! %s: %q", x.dir, string(b))
+	return len(b), nil
 }
