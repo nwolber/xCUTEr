@@ -9,11 +9,16 @@ It watches a directory for job definition files and executes them.
 go get -u github.com/nwolber/xCUTEr/...
 ```
 
+Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS X and Windows to the `/bin` directory. 
+
 ## Command line arguments
 
-* `-jobs` Directory to watch for .job files
-* `-sshTTL` Time until an unused SSH connection is closed
-* `-log` Log file
+* `-jobs` Directory to watch for .job files.
+* `-sshTTL` Time until an unused SSH connection is closed.
+* `-file` Job file to execute.
+Takes presedence over `-jobs`.
+* `-once` Run the job given by `-file` only once, regardless of the [schedule](#schedule) directive.
+* `-log` Log file.
 
 ## Job definition
 
@@ -177,7 +182,11 @@ The host where to execute the commands in the job.
     "port": 22,
     "user": "root",
     "password": "root",
-    "privateKey": "id_rsa"
+    "privateKey": "id_rsa",
+    "keyboardInteractive": {
+        "Question1: ", "answer",
+        "QuestionN: ", "another answer"
+    }
 }
 ```
 * name: Display name for the host.
@@ -188,6 +197,9 @@ Also used in `hosts` to match against the `pattern`.
 * password: Password to use for authentication.
 * privateKey: Private key to use for authentication.
 Has to be unencrypted.
+* keyboardInteractive: Map of questions and answers.
+Questions have to match exactly (including possible trailing spaces).
+Order is ignored.
 
 ##### Hosts file
 File name where to find host definitions as well as a pattern to match against host names.
