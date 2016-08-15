@@ -167,7 +167,7 @@ func TestMaxCompleted(t *testing.T) {
 		<-done
 	}
 
-	if got := len(e.getCompleted()); got != want {
+	if got := len(e.GetCompleted()); got != want {
 		t.Errorf("expected %d jobs in completed list, got %d", want, got)
 	}
 }
