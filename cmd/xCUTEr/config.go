@@ -22,7 +22,7 @@ func config() (jobDir string, sshTTL time.Duration, file, logFile string, once b
 
 	flag.StringVar(&jobDir, "jobs", jobDirDefault, "Directory to watch for .job files")
 	flag.DurationVar(&sshTTL, "sshTTL", sshTTLDefault, "Time until an unused SSH connection is closed")
-	flag.StringVar(&file, "f", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
+	flag.StringVar(&file, "file", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
 	flag.StringVar(&logFile, "log", logFileDefault, "Log file")
 
