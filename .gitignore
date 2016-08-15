@@ -8,3 +8,5 @@ id_rsa*
 test_key*
 password
 bin
+cmd/xCUTEr/xCUTEr
+cmd/xValidate/xValidate

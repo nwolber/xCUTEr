@@ -149,10 +149,20 @@ func scheduleBody(e *executor, j *jobInfo) func() {
 	}
 }
 
-func (e *executor) Add(j *jobInfo) error {
-	// log.Printf("Execution tree\n%s", c)
-	// return nil
+func (e *executor) Run(j *jobInfo, once bool) {
+	if j.c.Schedule == "once" || once {
+		info := &runInfo{
+			e: e,
+			j: j,
+		}
+		e.run(info)
+	} else {
+		e.Add(j)
+	}
+}
 
+// Add schedules the job.
+func (e *executor) Add(j *jobInfo) error {
 	if j.c.Schedule == "once" {
 		info := &runInfo{
 			e: e,
