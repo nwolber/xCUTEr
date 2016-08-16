@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
+	"context"
 )
 
 func doSCP(ctx context.Context, privateKey []byte, addr string) error {

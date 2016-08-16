@@ -15,7 +15,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/flow"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type storeElement struct {

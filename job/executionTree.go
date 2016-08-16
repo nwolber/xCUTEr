@@ -16,7 +16,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/flunc"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // ExecutionTree creates the execution tree necessary to executeCommand

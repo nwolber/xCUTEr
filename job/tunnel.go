@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // forward instructs the connect SSH server to forward all connections attempts
