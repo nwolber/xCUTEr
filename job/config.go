@@ -5,11 +5,13 @@
 package job
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"regexp"
+	"text/template"
 	"time"
 )
 
@@ -67,8 +69,9 @@ func (c *Config) JSON() string {
 }
 
 type hostsFile struct {
-	File    string `json:"file,omitempty"`
-	Pattern string `json:"pattern,omitempty"`
+	File        string `json:"file,omitempty"`
+	Pattern     string `json:"pattern,omitempty"`
+	MatchString string `json:"matchString,omitempty"`
 }
 
 type host struct {
@@ -79,6 +82,7 @@ type host struct {
 	PrivateKey          string            `json:"privateKey,omitempty"`
 	Password            string            `json:"password,omitempty"`
 	KeyboardInteractive map[string]string `json:"keyboardInteractive,omitempty"`
+	Tags                map[string]string `json:"tags,omitempty"`
 }
 
 type forwarding struct {
@@ -132,7 +136,7 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(b, &hosts); err != nil {
+	if err = json.Unmarshal(b, &hosts); err != nil {
 		return nil, err
 	}
 
@@ -147,10 +151,37 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 			host.Name = k
 		}
 
-		if regex.MatchString(k) {
+		matchString := k
+		if file.MatchString != "" {
+			matchString, err = interpolate(file.MatchString, host)
+			if err != nil {
+				log.Printf("string interpolation failed for match string %q and host %#v: %s", file.MatchString, host, err)
+				return nil, err
+			}
+
+			if matchString == "" {
+				log.Printf("match string is empty for host %#v", host)
+			}
+		}
+
+		if regex.MatchString(matchString) {
 			filteredHosts[k] = host
 		}
 	}
 
 	return &filteredHosts, nil
+}
+
+func interpolate(text string, h *host) (string, error) {
+	t, err := template.New("").Parse(text)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, h); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
