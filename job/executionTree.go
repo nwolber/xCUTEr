@@ -96,7 +96,7 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(file)
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open job output file %s %s", file, err)
 			return nil, err
@@ -380,7 +380,7 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(path)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
@@ -420,7 +420,7 @@ func (*executionTreeVisitor) Stderr(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(path)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
