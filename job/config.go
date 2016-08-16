@@ -58,7 +58,7 @@ func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 
 // JSON generates the Config's JSON representation.
 func (c *Config) JSON() string {
-	b, err := json.Marshal(c)
+	b, err := json.MarshalIndent(c, "", "\t")
 	if err != nil {
 		log.Println("error marshalling config", err)
 		return ""
