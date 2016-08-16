@@ -138,7 +138,7 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 			return nil, err
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s:%d: ", jobName, h.Addr, h.Port), log.Flags())
+		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, h.Name), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	})
