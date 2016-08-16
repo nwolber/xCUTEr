@@ -212,6 +212,21 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	})
 }
 
+func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
+	f, ok := child.(flunc.Flunc)
+	if !ok {
+		log.Panicf("not a flunc %T", child)
+	}
+
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		_, err := f(ctx)
+		return nil, err
+	})
+}
+
 func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
