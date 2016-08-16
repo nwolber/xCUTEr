@@ -335,6 +335,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
+		log.Println("executing local command", command)
 		go func(cmd *exec.Cmd, c chan<- error) {
 			if err := cmd.Run(); err != nil {
 				l.Println("error running", exe, err)
