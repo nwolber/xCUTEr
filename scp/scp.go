@@ -15,17 +15,19 @@ import (
 )
 
 var (
-	errUnexpectedToken       = errors.New("unexpected token")
+	errInvalidToken          = errors.New("invalid token")
+	errInvalidLength         = errors.New("invalid length")
 	errMessageTypeNotAllowed = errors.New("message type not allowed")
 )
 
 type scp struct {
-	name      string
+	name, dir string
 	recursive bool
 	in        *bufio.Reader
 	out       io.Writer
 	buffer    []byte
-	storeFile func(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
+	openFile  func(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
+	mkdir     func(name string, perm os.FileMode) error
 }
 
 func args(command string) (name string, recursive, transfer bool, err error) {
@@ -53,25 +55,40 @@ func New(command string, in io.Reader, out io.Writer) error {
 		return fmt.Errorf("unknown command %q", command)
 	}
 
-	return new(name, recursive, in, out).run()
+	s, err := new(name, recursive, in, out)
+	if err != nil {
+		return err
+	}
+	return s.run()
 }
 
-func new(name string, recursive bool, in io.Reader, out io.Writer) *scp {
+func new(name string, recursive bool, in io.Reader, out io.Writer) (*scp, error) {
+	path, err := filepath.Abs(name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &scp{
 		name:      name,
+		dir:       path,
 		recursive: recursive,
 		in:        bufio.NewReader(in),
 		out:       out,
-		storeFile: func(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+		mkdir:     os.Mkdir,
+		openFile: func(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
 			f, err := os.OpenFile(name, flag, perm)
 			return f, err
 		},
-	}
+	}, nil
 }
 
 func (s *scp) run() error {
 	log.Println("Initiating transfer")
 	err := s.transfer()
+
+	if err == io.EOF {
+		return nil
+	}
 
 	if err != nil {
 		s.out.Write([]byte("\x01" + err.Error()))
@@ -110,6 +127,10 @@ func (s *scp) transfer() error {
 		switch msg.typ {
 		case "C":
 			err = s.processCMessage(msg)
+		case "D":
+			err = s.processDMessage(msg)
+		case "E":
+			err = s.processEMessage(msg)
 		}
 
 		if err != nil {
@@ -134,7 +155,7 @@ type scpMessage struct {
 }
 
 func (msg scpMessage) String() string {
-	return fmt.Sprintf("{FileMode: %04o, Length: %d, Name: %q}", uint32(msg.fileMode), msg.length, msg.fileName)
+	return fmt.Sprintf("%s%04o %d %s\n", msg.typ, uint32(msg.fileMode), msg.length, msg.fileName)
 }
 
 func parseSCPMessage(input []byte) (scpMessage, error) {
@@ -145,14 +166,20 @@ func parseSCPMessage(input []byte) (scpMessage, error) {
 	var msg scpMessage
 
 	switch input[0] {
+	case 'E':
+		msg.typ = string(input[0])
+		if len(input) > 1 && input[1] == '\n' {
+			return msg, nil
+		}
+		return msg, errInvalidToken
+
 	case 'C':
 		fallthrough
 	case 'D':
-		fallthrough
-	case 'E':
 		msg.typ = string(input[0])
+
 	default:
-		return msg, errUnexpectedToken
+		return msg, errInvalidToken
 	}
 
 	buf := bytes.NewBuffer(input)
@@ -162,7 +189,7 @@ func parseSCPMessage(input []byte) (scpMessage, error) {
 	}
 
 	if len(b) != 6 {
-		return msg, errUnexpectedToken
+		return msg, errInvalidToken
 	}
 
 	mode, err := strconv.ParseUint(string(b[1:5]), 8, 32)
@@ -198,7 +225,7 @@ func (s *scp) processCMessage(msg scpMessage) error {
 	log.Printf("received C-message %s", msg)
 
 	path := filePath(s.name, msg.fileName)
-	f, err := s.storeFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, msg.fileMode)
+	f, err := s.openFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, msg.fileMode)
 	if err != nil {
 		return err
 	}
@@ -227,6 +254,38 @@ func (s *scp) processCMessage(msg scpMessage) error {
 
 		n += uint64(read)
 	}
+
+	b, err := s.in.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	if b != 0 {
+		return errInvalidToken
+	}
+
+	return nil
+}
+
+func (s *scp) processDMessage(msg scpMessage) error {
+	if msg.length != 0 {
+		return errInvalidLength
+	}
+
+	s.dir = filepath.Join(s.dir, msg.fileName)
+
+	s.mkdir(s.dir, msg.fileMode)
+
+	ack(s.out)
+
+	return nil
+}
+
+func (s *scp) processEMessage(msg scpMessage) error {
+	s.dir, _ = filepath.Split(s.dir)
+	s.dir = filepath.Clean(s.dir)
+
+	ack(s.out)
 
 	return nil
 }
