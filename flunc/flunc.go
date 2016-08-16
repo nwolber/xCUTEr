@@ -4,7 +4,7 @@
 
 package flunc
 
-import "golang.org/x/net/context"
+import "context"
 
 // A Flunc is a function that is able to run in a given context. It may
 // manipulate the context by returning a new one.

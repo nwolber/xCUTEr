@@ -7,7 +7,7 @@ package flow
 import (
 	"log"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // Completer signals completion.

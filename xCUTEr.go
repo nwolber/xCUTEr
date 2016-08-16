@@ -12,7 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/nwolber/xCUTEr/job"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type xcuter struct {

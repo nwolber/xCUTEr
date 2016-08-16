@@ -35,6 +35,8 @@ type configVisitor interface {
 	Hosts() group
 	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
+	ContextBounds(child interface{}) interface{}
+	Retry(child interface{}, retries uint) interface{}
 	Templating(c *Config, h *host) interface{}
 	SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{}
 	Forwarding(f *forwarding) interface{}
@@ -87,7 +89,8 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 			return nil, err
 		}
 		host.Append(cmd)
-		children.Append(builder.ErrorSafeguard(host.Wrap()))
+		// Prevent errors from bubbling up and release resources, as soon as the host is done.
+		children.Append(builder.ErrorSafeguard(builder.ContextBounds(host.Wrap())))
 	}
 
 	if c.HostsFile != nil {
@@ -103,7 +106,8 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 				return nil, err
 			}
 			host.Append(cmd)
-			hostFluncs.Append(builder.ErrorSafeguard(host.Wrap()))
+			// Prevent errors from bubbling up and release resources, as soon as the host is done.
+			hostFluncs.Append(builder.ErrorSafeguard(builder.ContextBounds(host.Wrap())))
 		}
 		children.Append(hostFluncs.Wrap())
 	}
@@ -196,5 +200,11 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 
 	children.Append(cmds)
 
-	return children.Wrap(), nil
+	wrappedChildren := builder.ContextBounds(children.Wrap())
+
+	if cmd.Retries > 1 {
+		wrappedChildren = builder.Retry(wrappedChildren, cmd.Retries)
+	}
+
+	return wrappedChildren, nil
 }

@@ -14,28 +14,38 @@ import (
 )
 
 func main() {
-	file, all, raw := flags()
+	file, all, raw, full, json := flags()
 
 	config, err := job.ReadConfig(file)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	if all {
-		fmt.Printf("Execution tree:\n%s", config.Tree(false, raw, 0, 0))
-	} else {
-		fmt.Printf("Execution tree:\n%s", config.Tree(false, raw, 1, 0))
+	if json {
+		fmt.Println(config.JSON())
+		return
 	}
+
+	maxHosts := 0
+	if !all {
+		maxHosts = 1
+	}
+
+	fmt.Printf("Execution tree:\n%s", config.Tree(full, raw, maxHosts, 0))
 }
 
-func flags() (file string, all, raw bool) {
+func flags() (file string, all, raw, full, json bool) {
 	const (
-		allDefault = false
-		rawDefault = false
+		allDefault  = false
+		rawDefault  = false
+		fullDefault = false
+		jsonDefault = false
 	)
 
 	flag.BoolVar(&all, "all", allDefault, "Display all hosts.")
-	flag.BoolVar(&raw, "raw", rawDefault, "Display without templating")
+	flag.BoolVar(&raw, "raw", rawDefault, "Display without templating.")
+	flag.BoolVar(&full, "full", fullDefault, "Display all directives, including infrastructure.")
+	flag.BoolVar(&json, "json", jsonDefault, "Display json representation.")
 	help := flag.Bool("help", false, "Display this help.")
 	flag.Parse()
 
