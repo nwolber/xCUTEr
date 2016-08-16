@@ -13,9 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/nwolber/xCUTEr/flow"
 	"golang.org/x/crypto/ssh"
-	"context"
 )
 
 type storeElement struct {
@@ -55,7 +56,7 @@ func InitializeSSHClientStore(ttl time.Duration) {
 				defer store.m.Unlock()
 
 				for key, elem := range store.clients {
-					if diff := time.Now().Sub(elem.lastUsed); elem.ref == 0 && diff > ttl {
+					if diff := time.Now().Sub(elem.lastUsed); elem.ref <= 0 && diff > ttl {
 						log.Println("connection to", key, "unused for", diff, "closing")
 						elem.client.c.Close()
 						delete(store.clients, key)
@@ -80,12 +81,28 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			return nil, err
 		}
 
+		go func(client *sshClient) {
+			err := client.c.Wait()
+			log.Println("connection closed, removing from store:", err)
+
+			store.m.Lock()
+			defer store.m.Unlock()
+			if _, ok := store.clients[key]; ok {
+				delete(store.clients, key)
+			} else {
+				log.Println("didn't find a client to remove")
+			}
+		}(client)
+
 		elem = &storeElement{
 			client: client,
 		}
 		store.clients[key] = elem
+	} else {
+		log.Println("reusing existing connection")
 	}
 
+	elem.client.c.Wait()
 	elem.ref++
 	elem.lastUsed = time.Now()
 
@@ -135,7 +152,7 @@ func createClient(addr, user, keyFile, password string, keyboardInteractive map[
 		config.Auth = append(config.Auth, ssh.KeyboardInteractive(keyboardInteractiveChallenge(user, keyboardInteractive)))
 	}
 
-	log.Println("connecting to", addr)
+	log.Println("no existing connection, connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return nil, err
@@ -149,10 +166,6 @@ func createClient(addr, user, keyFile, password string, keyboardInteractive map[
 
 func keyboardInteractiveChallenge(user string, keyboardInteractive map[string]string) ssh.KeyboardInteractiveChallenge {
 	return func(challengeUser, instruction string, questions []string, echos []bool) ([]string, error) {
-		if user != challengeUser {
-			return nil, errUnknownUser
-		}
-
 		if len(questions) == 0 {
 			return nil, nil
 		}
