@@ -102,6 +102,10 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			return nil, err
 		}
 
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
+
 		go func(ctx context.Context, f io.Closer) {
 			<-ctx.Done()
 			f.Close()
@@ -404,6 +408,10 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 		}
 		l.Println("opened", path, "for stdout")
 
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
+
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()
 			l.Println("closing stdout", path)
@@ -443,6 +451,10 @@ func (*executionTreeVisitor) Stderr(file string) interface{} {
 			return nil, err
 		}
 		l.Println("opened", path, "for stderr")
+
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()
