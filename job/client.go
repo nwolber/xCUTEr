@@ -102,7 +102,6 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		log.Println("reusing existing connection")
 	}
 
-	elem.client.c.Wait()
 	elem.ref++
 	elem.lastUsed = time.Now()
 
