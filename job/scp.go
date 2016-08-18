@@ -171,32 +171,19 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 	default:
 	}
 
-	cmd := exec.Command(exe, parts[1:]...)
+	cmd := exec.CommandContext(ctx, exe, parts[1:]...)
 	cmd.Stdin = channel
 	cmd.Stdout = channel
 	cmd.Stderr = os.Stderr
 
-	processTerminated := make(chan int)
+	exitCode := 0
+	if err := cmd.Run(); err != nil {
+		l.Println("error running", exe, err)
+		exitCode = 1
 
-	go func(cmd *exec.Cmd, c chan<- int) {
-		if err := cmd.Run(); err != nil {
-			l.Println("error running", exe, err)
-
-			// TODO get exit code from err.(*exec.ExitStatus)
-			c <- 1
-		} else {
-			l.Println(exe, "completed successfully")
-			c <- 0
-		}
-	}(cmd, processTerminated)
-
-	var exitCode int
-	select {
-	case exitCode = <-processTerminated:
-	case <-ctx.Done():
-		l.Println("context completed, killing process")
-		cmd.Process.Kill()
-		exitCode = 255
+		// TODO get exit code from err.(*exec.ExitStatus)
+	} else {
+		l.Println(exe, "completed successfully")
 	}
 
 	var buf bytes.Buffer
