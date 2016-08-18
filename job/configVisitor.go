@@ -199,5 +199,5 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 
 	children.Append(cmds)
 
-	return children.Wrap(), nil
+	return builder.ContextBounds(children.Wrap()), nil
 }
