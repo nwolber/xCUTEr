@@ -253,7 +253,8 @@ In combination with the `forwarding`option, this allows for file transfer betwee
 "scp": {
     "addr": "localhost",
     "port": 34567,
-    "key": "id_rsa"
+    "key": "id_rsa",
+    "verbose": true,
 }
 ```
 * addr: Interfaces to listen on.
@@ -261,6 +262,8 @@ Either a hostname, an IP address or `0.0.0.0`.
 * port: Port to listen on for incoming SCP connections.
 * key: Key file to use for SSH authentication against the client.
 Has to be unencrypted.
+* verbose: Outputs SCP's STDERR to xCUTEr's STDERR.
+Useful for debugging purposes.
 
 ##### Command
 A command es executed on the host defined by either `host` or `hosts`.

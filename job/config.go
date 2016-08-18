@@ -93,9 +93,10 @@ type forwarding struct {
 }
 
 type scp struct {
-	Addr string `json:"addr,omitempty"`
-	Port uint   `json:"port,omitempty"`
-	Key  string `json:"key,omitempty"`
+	Addr    string `json:"addr,omitempty"`
+	Port    uint   `json:"port,omitempty"`
+	Key     string `json:"key,omitempty"`
+	Verbose bool   `json:"verbose,omitempty"`
 }
 
 type command struct {

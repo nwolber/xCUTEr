@@ -180,7 +180,7 @@ func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
 
 		addr := fmt.Sprintf("%s:%d", scp.Addr, scp.Port)
 		l.Println("setting up scp on", addr)
-		doSCP(ctx, b, addr)
+		doSCP(ctx, b, addr, scp.Verbose)
 		return nil, nil
 	})
 }
