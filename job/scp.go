@@ -14,8 +14,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"golang.org/x/crypto/ssh"
 	"context"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func doSCP(ctx context.Context, privateKey []byte, addr string) error {
@@ -173,6 +174,7 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 	cmd := exec.Command(exe, parts[1:]...)
 	cmd.Stdin = channel
 	cmd.Stdout = channel
+	cmd.Stderr = os.Stderr
 
 	processTerminated := make(chan int)
 
