@@ -105,6 +105,7 @@ type command struct {
 	Commands []*command `json:"commands,omitempty`
 	Flow     string     `json:"flow,omitempty"`
 	Target   string     `json:"target,omitempty"`
+	Retries  uint       `json:"retries,omitempty"`
 	Stdout   string     `json:"stdout,omitempty"`
 	Stderr   string     `json:"stderr,omitempty"`
 }

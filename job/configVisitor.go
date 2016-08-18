@@ -36,6 +36,7 @@ type configVisitor interface {
 	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
 	ContextBounds(child interface{}) interface{}
+	Retry(child interface{}, retries uint) interface{}
 	Templating(c *Config, h *host) interface{}
 	SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{}
 	Forwarding(f *forwarding) interface{}
@@ -199,5 +200,11 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 
 	children.Append(cmds)
 
-	return builder.ContextBounds(children.Wrap()), nil
+	wrappedChildren := builder.ContextBounds(children.Wrap())
+
+	if cmd.Retries > 1 {
+		wrappedChildren = builder.Retry(wrappedChildren, cmd.Retries)
+	}
+
+	return wrappedChildren, nil
 }

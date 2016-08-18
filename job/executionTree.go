@@ -231,6 +231,41 @@ func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
 	})
 }
 
+func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
+	if retries < 0 {
+		log.Fatalln("retries has to be greater than 0.")
+	}
+
+	f, ok := child.(flunc.Flunc)
+	if !ok {
+		log.Panicf("not a flunc %T", child)
+	}
+
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		var (
+			i        uint
+			childCtx context.Context
+			err      error
+		)
+		for ; i < retries; i++ {
+			childCtx, err = f(ctx)
+			if err != nil {
+				l.Println("retrying, previous attempt failed:", err)
+				continue
+			}
+		}
+
+		return childCtx, err
+	})
+}
+
 func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)

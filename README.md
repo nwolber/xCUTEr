@@ -274,6 +274,7 @@ A command es executed on the host defined by either `host` or `hosts`.
     "commands": [ ... ],
     "flow": "sequential",
     "target": "local",
+    "retries": 3,
     "stdout": "stdout.txt",
     "stderr": "stderr.txt"
 }
@@ -289,6 +290,7 @@ Either `sequential`, one after the other, or `parallel`, all at once.
 Only meaningful together with `commands`.
 * target: Where to execute the command.
 Either empty for hosts or `local` to execute on the machine xCUTEr is running on.
+* retries: How often to retry a failed command.
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 Supports *[templating](#templating)*.
