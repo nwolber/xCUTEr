@@ -349,19 +349,16 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
 		stderr, _ := ctx.Value(stderrKey).(io.Writer)
 
-		// processTerminated := make(chan error)
-		// cmd := exec.Command(exe, args...)
 		cmd := exec.CommandContext(ctx, exe, args...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
 		l.Println("executing local command", command)
-		// go func(cmd *exec.Cmd, c chan<- error) {
 		if err := cmd.Run(); err != nil {
 			l.Printf("error running %q locally: %s", command, err)
 			return nil, err
 		}
-		l.Println("%q completed successfully", command)
+		l.Printf("%q completed successfully", command)
 		return nil, nil
 	})
 }
