@@ -191,8 +191,8 @@ The host where to execute the commands in the job.
     "password": "root",
     "privateKey": "id_rsa",
     "keyboardInteractive": {
-        "Question1: ", "answer",
-        "QuestionN: ", "another answer"
+        "Question1: ": "answer",
+        "QuestionN: ": "another answer"
     },
     "tags": {
         "os": "Debian",
