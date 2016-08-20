@@ -34,9 +34,3 @@ func TestKINoQuestions(t *testing.T) {
 	answers, _ := c(user, "", []string{}, nil)
 	expect(t, 0, len(answers))
 }
-
-func TestKIUnknownUser(t *testing.T) {
-	c := keyboardInteractiveChallenge("user", nil)
-	_, err := c("wrong user", "", nil, nil)
-	expect(t, errUnknownUser, err)
-}

@@ -59,13 +59,19 @@ The `name` property can be left out, as the name is taken from the property key.
         "addr": "thaddeus.example.com",
         "port": 1337,
         "user": "me",
-        "password": "secret"
+        "password": "secret",
+        "tags": {
+            "provider": "Leet Corporation"
+        }
     },
     "Crappy box": {
         "addr": "eugene.example.com",
         "port": 15289,
         "user": "me",
-        "password": ""
+        "password": "",
+        "tags": {
+            "provider": "Me PLC"
+        }
     }
 }
 ```
@@ -77,7 +83,8 @@ The hosts file can be used in a Job like this:
     "schedule": "once",
     "hosts": {
         "file": "hosts.json",
-        "pattern": "thaddeus.*",
+        "pattern": "Leet Corporation",
+        "matchString": "{{.Tags.provider}}"
     },
     "command": "echo \"Hello xCUTEr\""
 }
@@ -184,8 +191,12 @@ The host where to execute the commands in the job.
     "password": "root",
     "privateKey": "id_rsa",
     "keyboardInteractive": {
-        "Question1: ", "answer",
-        "QuestionN: ", "another answer"
+        "Question1: ": "answer",
+        "QuestionN: ": "another answer"
+    },
+    "tags": {
+        "os": "Debian",
+        "app": "DB"
     }
 }
 ```
@@ -200,18 +211,23 @@ Has to be unencrypted.
 * keyboardInteractive: Map of questions and answers.
 Questions have to match exactly (including possible trailing spaces).
 Order is ignored.
+* tags: Map of keys and values.
+Can be used in the match string of a hosts file.
 
 ##### Hosts file
 File name where to find host definitions as well as a pattern to match against host names.
 ```json
 "hosts": {
     "file": "hosts.json",
-    "pattern": ".*"
+    "pattern": "Debian_DB",
+    "matchString": "{{.Tags.os}}_{{.Tags.app}}
 }
 ```
 * file: File name or path of the hosts file.
 * pattern: Regular expression to filter hosts from hosts file.
 The syntax can be found [here](https://godoc.org/regexp/syntax).
+* matchString: If present used instead of the hosts `Name`field for pattern matching against `pattern`.
+Supports templating with any field from the host, including tags.
 
 ##### Forwarding
 Forwarding instructs the host to open a tunnel from the host to the machine xCUTEr is running on.
@@ -237,7 +253,8 @@ In combination with the `forwarding`option, this allows for file transfer betwee
 "scp": {
     "addr": "localhost",
     "port": 34567,
-    "key": "id_rsa"
+    "key": "id_rsa",
+    "verbose": true,
 }
 ```
 * addr: Interfaces to listen on.
@@ -245,6 +262,8 @@ Either a hostname, an IP address or `0.0.0.0`.
 * port: Port to listen on for incoming SCP connections.
 * key: Key file to use for SSH authentication against the client.
 Has to be unencrypted.
+* verbose: Outputs SCP's STDERR to xCUTEr's STDERR.
+Useful for debugging purposes.
 
 ##### Command
 A command es executed on the host defined by either `host` or `hosts`.
@@ -255,6 +274,7 @@ A command es executed on the host defined by either `host` or `hosts`.
     "commands": [ ... ],
     "flow": "sequential",
     "target": "local",
+    "retries": 3,
     "stdout": "stdout.txt",
     "stderr": "stderr.txt"
 }
@@ -270,6 +290,7 @@ Either `sequential`, one after the other, or `parallel`, all at once.
 Only meaningful together with `commands`.
 * target: Where to execute the command.
 Either empty for hosts or `local` to execute on the machine xCUTEr is running on.
+* retries: How often to retry a failed command.
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 Supports *[templating](#templating)*.

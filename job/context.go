@@ -9,7 +9,7 @@ import (
 	"log"
 	"net"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type acceptMsg struct {

@@ -16,7 +16,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/flunc"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // ExecutionTree creates the execution tree necessary to executeCommand
@@ -96,11 +96,15 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(file)
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open job output file %s %s", file, err)
 			return nil, err
 		}
+
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer) {
 			<-ctx.Done()
@@ -138,7 +142,7 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 			return nil, err
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s:%d: ", jobName, h.Addr, h.Port), log.Flags())
+		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, h.Name), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	})
@@ -176,7 +180,7 @@ func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
 
 		addr := fmt.Sprintf("%s:%d", scp.Addr, scp.Port)
 		l.Println("setting up scp on", addr)
-		doSCP(ctx, b, addr)
+		doSCP(ctx, b, addr, scp.Verbose)
 		return nil, nil
 	})
 }
@@ -209,6 +213,56 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 			return nil, nil
 		}
 		return ctx, nil
+	})
+}
+
+func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
+	f, ok := child.(flunc.Flunc)
+	if !ok {
+		log.Panicf("not a flunc %T", child)
+	}
+
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		_, err := f(ctx)
+		return nil, err
+	})
+}
+
+func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
+	if retries < 0 {
+		log.Fatalln("retries has to be greater than 0.")
+	}
+
+	f, ok := child.(flunc.Flunc)
+	if !ok {
+		log.Panicf("not a flunc %T", child)
+	}
+
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		var (
+			i        uint
+			childCtx context.Context
+			err      error
+		)
+		for ; i < retries; i++ {
+			childCtx, err = f(ctx)
+			if err != nil {
+				l.Println("retrying, previous attempt failed:", err)
+				continue
+			}
+		}
+
+		return childCtx, err
 	})
 }
 
@@ -330,30 +384,16 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
 		stderr, _ := ctx.Value(stderrKey).(io.Writer)
 
-		processTerminated := make(chan error)
-		cmd := exec.Command(exe, args...)
+		cmd := exec.CommandContext(ctx, exe, args...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
-		go func(cmd *exec.Cmd, c chan<- error) {
-			if err := cmd.Run(); err != nil {
-				l.Println("error running", exe, err)
-
-				// TODO get exit code from err.(*exec.ExitStatus)
-				c <- err
-			} else {
-				l.Println(exe, "completed successfully")
-				c <- nil
-			}
-		}(cmd, processTerminated)
-
-		select {
-		case err = <-processTerminated:
+		l.Println("executing local command", command)
+		if err := cmd.Run(); err != nil {
+			l.Printf("error running %q locally: %s", command, err)
 			return nil, err
-		case <-ctx.Done():
-			l.Println("context completed, killing process")
-			cmd.Process.Kill()
 		}
+		l.Printf("%q completed successfully", command)
 		return nil, nil
 	})
 }
@@ -380,13 +420,17 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(path)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
 			return nil, err
 		}
 		l.Println("opened", path, "for stdout")
+
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()
@@ -420,13 +464,17 @@ func (*executionTreeVisitor) Stderr(file string) interface{} {
 			return nil, err
 		}
 
-		f, err := os.Create(path)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
 			return nil, err
 		}
 		l.Println("opened", path, "for stderr")
+
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()

@@ -223,6 +223,37 @@ func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
 	return child
 }
 
+func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
+	stringer, ok := child.(Stringer)
+	if !ok {
+		log.Panicf("not a Stringer %T", child)
+	}
+
+	if s.full {
+		return &multiple{
+			typ: "Context Bounds",
+			stringers: []Stringer{
+				stringer,
+			},
+		}
+	}
+	return child
+}
+
+func (s *stringVisitor) Retry(child interface{}, retries uint) interface{} {
+	stringer, ok := child.(Stringer)
+	if !ok {
+		log.Panicf("not a Stringer %T", child)
+	}
+
+	return &multiple{
+		typ: fmt.Sprintf("Retry up to %d times", retries),
+		stringers: []Stringer{
+			stringer,
+		},
+	}
+}
+
 func (s *stringVisitor) Templating(c *Config, h *host) interface{} {
 	if s.full {
 		return simple("Create templating engine")

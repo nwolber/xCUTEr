@@ -5,11 +5,13 @@
 package job
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"regexp"
+	"text/template"
 	"time"
 )
 
@@ -58,7 +60,7 @@ func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 
 // JSON generates the Config's JSON representation.
 func (c *Config) JSON() string {
-	b, err := json.Marshal(c)
+	b, err := json.MarshalIndent(c, "", "\t")
 	if err != nil {
 		log.Println("error marshalling config", err)
 		return ""
@@ -67,8 +69,9 @@ func (c *Config) JSON() string {
 }
 
 type hostsFile struct {
-	File    string `json:"file,omitempty"`
-	Pattern string `json:"pattern,omitempty"`
+	File        string `json:"file,omitempty"`
+	Pattern     string `json:"pattern,omitempty"`
+	MatchString string `json:"matchString,omitempty"`
 }
 
 type host struct {
@@ -79,6 +82,7 @@ type host struct {
 	PrivateKey          string            `json:"privateKey,omitempty"`
 	Password            string            `json:"password,omitempty"`
 	KeyboardInteractive map[string]string `json:"keyboardInteractive,omitempty"`
+	Tags                map[string]string `json:"tags,omitempty"`
 }
 
 type forwarding struct {
@@ -89,9 +93,10 @@ type forwarding struct {
 }
 
 type scpData struct {
-	Addr string `json:"addr,omitempty"`
-	Port uint   `json:"port,omitempty"`
-	Key  string `json:"key,omitempty"`
+	Addr    string `json:"addr,omitempty"`
+	Port    uint   `json:"port,omitempty"`
+	Key     string `json:"key,omitempty"`
+	Verbose bool   `json:"verbose,omitempty"`
 }
 
 type command struct {
@@ -100,6 +105,7 @@ type command struct {
 	Commands []*command `json:"commands,omitempty`
 	Flow     string     `json:"flow,omitempty"`
 	Target   string     `json:"target,omitempty"`
+	Retries  uint       `json:"retries,omitempty"`
 	Stdout   string     `json:"stdout,omitempty"`
 	Stderr   string     `json:"stderr,omitempty"`
 }
@@ -132,7 +138,7 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(b, &hosts); err != nil {
+	if err = json.Unmarshal(b, &hosts); err != nil {
 		return nil, err
 	}
 
@@ -147,10 +153,37 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 			host.Name = k
 		}
 
-		if regex.MatchString(k) {
+		matchString := k
+		if file.MatchString != "" {
+			matchString, err = interpolate(file.MatchString, host)
+			if err != nil {
+				log.Printf("string interpolation failed for match string %q and host %#v: %s", file.MatchString, host, err)
+				return nil, err
+			}
+
+			if matchString == "" {
+				log.Printf("match string is empty for host %#v", host)
+			}
+		}
+
+		if regex.MatchString(matchString) {
 			filteredHosts[k] = host
 		}
 	}
 
 	return &filteredHosts, nil
+}
+
+func interpolate(text string, h *host) (string, error) {
+	t, err := template.New("").Parse(text)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, h); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

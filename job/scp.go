@@ -15,14 +15,14 @@ import (
 	"os/exec"
 	"strings"
 
+	"context"
+
 	"github.com/nwolber/xCUTEr/scp"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
-	// "golang.org/x/net/context"
 )
 
-func doSCP(ctx context.Context, privateKey []byte, addr string) error {
+func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) error {
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
@@ -76,7 +76,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string) error {
 				}
 				l.Println("accepted new connection")
 
-				go handleSSHConnection(ctx, conn, config)
+				go handleSSHConnection(ctx, conn, config, verbose)
 
 			case <-ctx.Done():
 				return
@@ -86,7 +86,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string) error {
 	return nil
 }
 
-func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.ServerConfig) {
+func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.ServerConfig, verbose bool) {
 	defer nConn.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
@@ -110,7 +110,9 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 				return
 			}
 
-			l.Println("New channel:", newChannel.ChannelType())
+			if verbose {
+				l.Println("New channel:", newChannel.ChannelType())
+			}
 
 			if newChannel.ChannelType() != "session" {
 				newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
@@ -130,10 +132,12 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 							return
 						}
 
-						l.Printf("%q requested: %q", req.Type, req.Payload)
+						if verbose {
+							l.Printf("%q requested: %q", req.Type, req.Payload)
+						}
 						switch req.Type {
 						case "exec":
-							go handleExecRequest(ctx, channel, req)
+							go handleExecRequest(ctx, channel, req, verbose)
 						default:
 							req.Reply(false, nil)
 						}
@@ -151,8 +155,8 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 	l.Println("handleSSHConnection: connection closed")
 }
 
-func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
-	oldSCP(ctx, channel, req)
+func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
+	oldSCP(ctx, channel, req, verbose)
 	// newSCP(ctx, channel, req)
 }
 
@@ -194,7 +198,7 @@ func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
 	channel.SendRequest("exit-status", false, buf.Bytes())
 }
 
-func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
+func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
 	defer channel.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
@@ -227,27 +231,18 @@ func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
 	cmd.Stdin = io.TeeReader(channel, &bla{dir: "input"})
 	cmd.Stdout = io.MultiWriter(channel, &bla{dir: "output"})
 
-	processTerminated := make(chan int)
+	if verbose {
+		cmd.Stderr = os.Stderr
+	}
 
-	go func(cmd *exec.Cmd, c chan<- int) {
-		if err := cmd.Run(); err != nil {
-			l.Println("error running", exe, err)
+	exitCode := 0
+	if err := cmd.Run(); err != nil {
+		l.Println("error running", exe, err)
+		exitCode = 1
 
-			// TODO get exit code from err.(*exec.ExitStatus)
-			c <- 1
-		} else {
-			l.Println(exe, "completed successfully")
-			c <- 0
-		}
-	}(cmd, processTerminated)
-
-	var exitCode int
-	select {
-	case exitCode = <-processTerminated:
-	case <-ctx.Done():
-		l.Println("context completed, killing process")
-		cmd.Process.Kill()
-		exitCode = 255
+		// TODO get exit code from err.(*exec.ExitStatus)
+	} else {
+		l.Println(exe, "completed successfully")
 	}
 
 	log.Printf("!!!!!!!!!!!!!!!!!!!! input: %q", input.String())

@@ -13,7 +13,7 @@ import (
 	sched "github.com/nwolber/cron"
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type jobInfo struct {

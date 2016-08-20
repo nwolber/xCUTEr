@@ -11,7 +11,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type watcher struct {
