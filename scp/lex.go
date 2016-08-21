@@ -36,43 +36,19 @@ func (l *lexReader) next() (r rune, err error) {
 	return r, io.EOF
 }
 
-func (l *lexReader) peek() (rune, error) {
-	r, err := l.next()
-	l.backup()
-	return r, err
-}
-
 func (l *lexReader) backup() {
 	l.cur -= l.width
 	l.pos--
 }
 
-func (l *lexReader) ignore() {
-	l.data = l.data[l.cur:]
-	l.cur = 0
-}
-
-func (l *lexReader) accept(valid string) (bool, error) {
-	b, err := l.next()
-	if err != nil {
-		return false, err
-	}
-
-	if strings.Contains(valid, string(b)) {
-		return true, nil
-	}
-	l.backup()
-	return false, nil
-}
-
-func (l *lexReader) acceptRun(valid string) error {
+func (l *lexReader) acceptFn(accept acceptFn) error {
 	for {
 		b, err := l.next()
 		if err != nil {
 			return err
 		}
 
-		if !strings.Contains(valid, string(b)) {
+		if !accept(b) {
 			l.backup()
 			break
 		}
@@ -80,20 +56,18 @@ func (l *lexReader) acceptRun(valid string) error {
 	return nil
 }
 
-type stateFn func(*lexer) stateFn
-
 type itemType int
 
 func (i itemType) String() string {
 	switch i {
 	case itemTyp:
 		return "itemTyp"
-	case itemPerm:
-		return "itemPerm"
-	case itemSize:
-		return "itemSize"
 	case itemName:
 		return "itemName"
+	case itemNumber:
+		return "itemNumber"
+	case itemSpace:
+		return "itemSpace"
 	case itemEnd:
 		return "itemEnd"
 	case itemError:
@@ -106,9 +80,9 @@ func (i itemType) String() string {
 
 const (
 	itemTyp itemType = iota
-	itemPerm
-	itemSize
 	itemName
+	itemNumber
+	itemSpace
 	itemEnd
 	itemError
 )
@@ -126,31 +100,12 @@ func (i item) String() string {
 		return fmt.Sprintf("<Error> %s", i.val)
 	}
 
-	return fmt.Sprintf("%q at pos %d", i.val, i.pos)
+	return fmt.Sprintf("<%s> %q at pos %d", i.itemType, i.val, i.pos)
 }
 
 type lexer struct {
-	in        *lexReader
-	items     chan item
-	recursive bool
-}
-
-func lex(b []byte) (*lexer, chan item) {
-	l := &lexer{
-		in: &lexReader{
-			data: b,
-		},
-		items: make(chan item),
-	}
-	go l.run()
-	return l, l.items
-}
-
-func (l *lexer) run() {
-	for state := lexType; state != nil; {
-		state = state(l)
-	}
-	close(l.items)
+	in    *lexReader
+	items chan item
 }
 
 func (l *lexer) error(err error) {
@@ -173,140 +128,140 @@ func (l *lexer) emit(t itemType) {
 	}
 }
 
-func lexType(l *lexer) stateFn {
-	valid := "C"
-
-	if l.recursive {
-		valid += "DE"
+func lex(b []byte) (*lexer, chan item) {
+	l := &lexer{
+		in: &lexReader{
+			data: b,
+		},
+		items: make(chan item),
 	}
-
-	r, err := l.in.next()
-
-	if err != nil {
-		l.error(err)
-		return nil
-	}
-
-	if l.recursive {
-		switch r {
-		case 'D':
-			fallthrough
-		case 'C':
-			l.emit(itemTyp)
-			return lexPermissions
-		case 'E':
-			l.emit(itemTyp)
-			return lexEnd
-		default:
-			l.error(fmt.Errorf("invalid token, expected: %q, found: %q at %d", "CDE", r, l.in.pos))
-			return nil
-		}
-	} else if r == 'C' {
-		l.emit(itemTyp)
-		return lexPermissions
-	} else {
-		l.error(fmt.Errorf("invalid token, expected: %q, found: %q at %d", "C", r, l.in.pos))
-	}
-
-	return nil
+	go l.run()
+	return l, l.items
 }
 
-func lexPermissions(l *lexer) stateFn {
-	valid := "01234567"
+func (l *lexer) run() {
+	defer close(l.items)
 
-	if ok, err := l.in.accept(valid); err != nil {
-		l.error(err)
-		return nil
-	} else if !ok {
-		l.error(fmt.Errorf("invalid token, expected: %q at %d", valid, l.in.pos))
-		return nil
-	}
-
-	l.in.acceptRun(valid)
-	l.emit(itemPerm)
-
-	return lexSize
-}
-
-func lexSize(l *lexer) stateFn {
-	if r, err := l.in.next(); err != nil {
-		l.error(err)
-		return nil
-	} else if r != ' ' {
-		l.error(fmt.Errorf("invalid token, expected: %q, found: %q at %d", ' ', r, l.in.pos))
-		return nil
-	} else {
-		l.in.ignore()
-	}
-
-	valid := "0123456789"
-
-	if ok, err := l.in.accept(valid); err != nil {
-		l.error(err)
-		return nil
-	} else if !ok {
-		l.error(fmt.Errorf("invalid token, expected: %q at %d", valid, l.in.pos))
-	}
-
-	l.in.acceptRun(valid)
-	l.emit(itemSize)
-
-	return lexName
-}
-
-func lexName(l *lexer) stateFn {
-	if r, err := l.in.next(); err != nil {
-		l.error(err)
-		return nil
-	} else if r != ' ' {
-		l.error(fmt.Errorf("invalid token, expected: %q, found: %q at %d", ' ', r, l.in.pos))
-		return nil
-	} else {
-		l.in.ignore()
-	}
-
-	r, err := l.in.next()
-	if err != nil {
-		l.error(err)
-		return nil
-	}
-
-	if !isPathCharacter(r) {
-		l.error(fmt.Errorf("lexer: expected a file name character, found: %q", r))
-		return nil
-	}
-
-	for {
+outer:
+	for states := start(l); states != nil; {
 		r, err := l.in.next()
 		if err != nil {
 			l.error(err)
-			return nil
+			return
 		}
 
-		if !isPathCharacter(r) {
-			l.in.backup()
-			break
+		for _, s := range states {
+			if s.acceptFn(r) {
+				states = s.stateFn(l)
+				continue outer
+			}
 		}
+
+		l.error(fmt.Errorf("unexpected rune: %q", r))
+		return
+	}
+}
+
+type acceptFn func(r rune) bool
+
+func acceptString(valid string) acceptFn {
+	return func(r rune) bool {
+		return strings.ContainsRune(valid, r)
+	}
+}
+
+type stateFn func(l *lexer) []state
+
+type state struct {
+	acceptFn
+	stateFn
+}
+
+func states(states ...state) []state {
+	return states
+}
+
+func start(l *lexer) []state {
+	valid := "CTDE"
+	return states(state{
+		acceptFn: acceptString(valid),
+		stateFn:  lexType,
+	})
+}
+
+func lexType(l *lexer) []state {
+	l.emit(itemTyp)
+	return states(
+		number(),
+		end(),
+	)
+}
+
+func number() state {
+	return state{
+		acceptFn: unicode.IsNumber,
+		stateFn:  lexNumber,
+	}
+}
+
+func lexNumber(l *lexer) []state {
+	if err := l.in.acceptFn(unicode.IsNumber); err != nil {
+		l.error(err)
 	}
 
-	l.emit(itemName)
+	l.emit(itemNumber)
+	return states(
+		space(),
+		end(),
+	)
+}
 
-	return lexEnd
+func space() state {
+	return state{
+		acceptFn: acceptString(" "),
+		stateFn:  lexSpace,
+	}
+}
+
+func lexSpace(l *lexer) []state {
+	l.emit(itemSpace)
+	return states(
+		number(),
+		name(),
+	)
 }
 
 func isPathCharacter(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsNumber(r) || r == os.PathSeparator || r == '.'
 }
 
-func lexEnd(l *lexer) stateFn {
-	r, err := l.in.next()
-	if err != nil {
-		l.error(err)
-	} else if r != '\n' {
-		l.error(fmt.Errorf("invalid token, expected: %q, found: %q at %d", '\n', r, l.in.pos))
-	} else {
-		l.emit(itemEnd)
+func name() state {
+	return state{
+		acceptFn: isPathCharacter,
+		stateFn:  lexName,
 	}
+}
 
+func lexName(l *lexer) []state {
+	if err := l.in.acceptFn(isPathCharacter); err != nil {
+		l.error(err)
+		return nil
+	}
+	l.emit(itemName)
+
+	return states(
+		end(),
+	)
+}
+
+func end() state {
+	return state{
+		acceptFn: acceptString("\n"),
+		stateFn:  lexEnd,
+	}
+}
+
+func lexEnd(l *lexer) []state {
+	l.emit(itemEnd)
 	return nil
 }

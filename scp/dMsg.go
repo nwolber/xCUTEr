@@ -19,15 +19,17 @@ func (m scpDMessage) String() string {
 
 func (m *scpDMessage) binders() []binder {
 	return []binder{
-		binder{itemPerm, func(val string) (err error) {
+		binder{itemNumber, func(val string) (err error) {
 			mode, err := strconv.ParseUint(val, 8, 32)
 			m.mode = os.FileMode(mode)
 			return
 		}},
-		binder{itemSize, func(val string) (err error) {
+		binder{itemSpace, nopBind},
+		binder{itemNumber, func(val string) (err error) {
 			m.length, err = strconv.ParseUint(val, 10, 64)
 			return
 		}},
+		binder{itemSpace, nopBind},
 		binder{itemName, func(val string) error {
 			m.name = val
 			return nil
@@ -46,6 +48,11 @@ func (m scpDMessage) process(s *scpImp) error {
 	s.dir = filepath.Join(s.dir, m.name)
 	if err := s.mkdir(s.dir, m.mode); err != nil {
 		return err
+	}
+
+	if s.timeSet {
+		s.chtimes(s.dir, s.aTime, s.mTime)
+		s.timeSet = false
 	}
 
 	ack(s.out)

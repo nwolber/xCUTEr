@@ -11,19 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-)
-
-const (
-	msgTypeC = "C"
-	msgTypeD = "D"
-	msgTypeE = "E"
+	"time"
 )
 
 var (
 	errInvalidLength = errors.New("invalid length")
 )
 
-func args(command string) (name string, recursive, transfer, source, verbose bool, err error) {
+func args(command string) (name string, recursive, transfer, source, verbose, times bool, err error) {
 	parts := strings.SplitN(command, " ", -1)
 	if len(parts) < 2 {
 		err = errors.New("expected at least 'scp' and one parameter")
@@ -35,19 +30,25 @@ func args(command string) (name string, recursive, transfer, source, verbose boo
 	set.BoolVar(&transfer, "t", false, "")
 	set.BoolVar(&source, "f", false, "")
 	set.BoolVar(&verbose, "v", false, "")
+	set.BoolVar(&times, "p", false, "")
 	err = set.Parse(parts[1:])
 	name = set.Arg(0)
 	return
 }
 
 type scpImp struct {
-	name, dir                        string
-	sink, source, verbose, recursive bool
-	in                               *bufio.Reader
-	out                              io.Writer
-	l                                *log.Logger
-	openFile                         func(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
-	mkdir                            func(name string, perm os.FileMode) error
+	name, dir        string
+	sink, source     bool
+	times, recursive bool
+	verbose          bool
+	in               *bufio.Reader
+	out              io.Writer
+	l                *log.Logger
+	mTime, aTime     time.Time
+	timeSet          bool
+	openFile         func(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
+	mkdir            func(name string, perm os.FileMode) error
+	chtimes          func(name string, aTime, mTime time.Time) error
 }
 
 func New(command string, in io.Reader, out io.Writer) error {
@@ -63,7 +64,7 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 		s   scpImp
 		err error
 	)
-	s.name, s.recursive, s.sink, s.source, s.verbose, err = args(command)
+	s.name, s.recursive, s.sink, s.source, s.verbose, s.times, err = args(command)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +81,7 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 		return os.OpenFile(name, flag, perm)
 	}
 	s.mkdir = os.MkdirAll
+	s.chtimes = os.Chtimes
 
 	output := ioutil.Discard
 	if s.verbose {
@@ -87,6 +89,7 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	}
 
 	s.l = log.New(output, "scp ", log.Flags())
+	s.l.Println(command)
 
 	return &s, nil
 }

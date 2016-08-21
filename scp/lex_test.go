@@ -75,26 +75,44 @@ func TestLexReaderBackup(t *testing.T) {
 	expect(t, uint8('t'), d[0])
 }
 
-func TestLexReaderIgnore(t *testing.T) {
-	reader := &lexReader{
-		data: []byte("test"),
-	}
+// func TestLexReaderIgnore(t *testing.T) {
+// 	reader := &lexReader{
+// 		data: []byte("test"),
+// 	}
 
-	reader.next()
-	reader.ignore()
-	reader.next()
+// 	reader.next()
+// 	reader.ignore()
+// 	reader.next()
 
-	d := reader.getData()
-	expect(t, utf8.RuneLen('e'), len(d))
-	expect(t, uint8('e'), d[0])
-}
+// 	d := reader.getData()
+// 	expect(t, utf8.RuneLen('e'), len(d))
+// 	expect(t, uint8('e'), d[0])
+// }
 
-func TestLexer(t *testing.T) {
+// func TestLexer(t *testing.T) {
+// 	_, c := lex([]byte("C0664 19 index.html\n"))
+// 	want := []item{
+// 		item{itemTyp, "C", 1},
+// 		item{itemPerm, "0664", 5},
+// 		item{itemSize, "19", 8},
+// 		item{itemName, "index.html", 19},
+// 		item{itemEnd, "\n", 20},
+// 	}
+
+// 	for _, item := range want {
+// 		i := <-c
+// 		expect(t, item, i)
+// 	}
+// }
+
+func TestLexerNew(t *testing.T) {
 	_, c := lex([]byte("C0664 19 index.html\n"))
 	want := []item{
 		item{itemTyp, "C", 1},
-		item{itemPerm, "0664", 5},
-		item{itemSize, "19", 8},
+		item{itemNumber, "0664", 5},
+		item{itemSpace, " ", 6},
+		item{itemNumber, "19", 8},
+		item{itemSpace, " ", 9},
 		item{itemName, "index.html", 19},
 		item{itemEnd, "\n", 20},
 	}
