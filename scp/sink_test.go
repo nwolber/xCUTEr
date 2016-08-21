@@ -37,7 +37,11 @@ func TestTransfer(t *testing.T) {
 
 	s, _ := scp("scp -t .", in, &out)
 	s.openFile = func(name string, flags int, mode os.FileMode) (io.WriteCloser, error) {
-		expect(t, fileName, name)
+		path, err := filepath.Abs(fileName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expect(t, path, name)
 		expect(t, mode, fileMode)
 		return &nopCloser{&file}, nil
 	}
@@ -63,32 +67,28 @@ func TestTransferError(t *testing.T) {
 	s.mkdir = nil
 	s.run()
 
-	expect(t, "\x00\x01test error", out.String())
+	expect(t, "\x00\x02test error", out.String())
 }
 
 func TestTransferRecursive(t *testing.T) {
 	var (
-		dir1 = scpMessage{
-			typ:  "D",
+		dir1 = scpDMessage{
 			mode: os.FileMode(0775),
 			name: "myDir",
 		}
 
-		file1 = scpMessage{
-			typ:    "C",
+		file1 = scpCMessage{
 			mode:   os.FileMode(0664),
 			length: 23,
 			name:   "file1.txt",
 		}
 
-		dir2 = scpMessage{
-			typ:  "D",
+		dir2 = scpDMessage{
 			mode: os.FileMode(0775),
 			name: "nestedDir",
 		}
 
-		file2 = scpMessage{
-			typ:    "C",
+		file2 = scpCMessage{
 			mode:   os.FileMode(0664),
 			length: 24,
 			name:   "file2.txt",
@@ -166,16 +166,18 @@ func TestInvalidFileMode(t *testing.T) {
 
 func TestHappyPath(t *testing.T) {
 	msg, err := parseSCPMessage([]byte("C0666 19 index.html\n"), false)
+	m := msg.(*scpCMessage)
 	expect(t, nil, err)
-	expect(t, os.FileMode(0666), msg.mode)
-	expect(t, uint64(19), msg.length)
-	expect(t, "index.html", msg.name)
+	expect(t, os.FileMode(0666), m.mode)
+	expect(t, uint64(19), m.length)
+	expect(t, "index.html", m.name)
 }
 
 func TestHappyPathEMessage(t *testing.T) {
 	msg, err := parseSCPMessage([]byte("E\n"), true)
+	_, ok := msg.(*scpEMessage)
+	expect(t, true, ok)
 	expect(t, nil, err)
-	expect(t, msg.typ, "E")
 }
 
 func TestLongEMessage(t *testing.T) {
@@ -216,165 +218,4 @@ func TestNegativeLength(t *testing.T) {
 	if err == nil {
 		t.Error("want: error, got: nil")
 	}
-}
-
-func TestProcessDMessageHappyPath(t *testing.T) {
-	const (
-		fileName = "myDir"
-		fileMode = os.FileMode(0222)
-	)
-
-	var (
-		recordedName string
-		recordedPerm os.FileMode
-	)
-
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r .", nil, &output)
-	s.mkdir = func(name string, perm os.FileMode) error {
-		recordedName = name
-		recordedPerm = perm
-		return nil
-	}
-
-	msg := scpMessage{
-		typ:    "D",
-		mode:   fileMode,
-		length: 0,
-		name:   fileName,
-	}
-
-	path, err := filepath.Abs(fileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.processDMessage(msg)
-	expect(t, nil, err)
-	expect(t, path, s.dir)
-	expect(t, path, recordedName)
-	expect(t, fileMode, recordedPerm)
-	expect(t, "\x00", output.String())
-}
-
-func TestProcessDMessageHappyPath2(t *testing.T) {
-	const (
-		wantFileName = "test/myDir"
-		filePerm     = os.FileMode(0666)
-	)
-
-	var (
-		recordedName string
-		recordedPerm os.FileMode
-	)
-
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r test", nil, &output)
-	s.openFile = nil
-	s.mkdir = func(name string, perm os.FileMode) error {
-		recordedName = name
-		recordedPerm = perm
-		return nil
-	}
-
-	msg := scpMessage{
-		typ:    "D",
-		mode:   filePerm,
-		length: 0,
-		name:   "myDir",
-	}
-
-	path, err := filepath.Abs(wantFileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.processDMessage(msg)
-	expect(t, nil, err)
-	expect(t, path, s.dir)
-	expect(t, path, recordedName)
-	expect(t, filePerm, recordedPerm)
-	expect(t, "\x00", output.String())
-}
-
-func TestProcessDMessageInvalidLength(t *testing.T) {
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r .", nil, &output)
-	msg := scpMessage{
-		typ:    "D",
-		mode:   os.FileMode(0222),
-		length: 42,
-		name:   "test",
-	}
-	err := s.processDMessage(msg)
-	expect(t, errInvalidLength, err)
-	expect(t, "", output.String())
-}
-
-func TestProcessEMessageHappyPath(t *testing.T) {
-	const (
-		name = "test"
-	)
-
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
-	s.dir, _ = filepath.Abs("test/mydir")
-	s.openFile = nil
-	s.mkdir = nil
-
-	path, err := filepath.Abs(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.processEMessage(scpMessage{typ: "E"})
-	expect(t, nil, err)
-	expect(t, path, s.dir)
-	expect(t, "\x00", output.String())
-}
-
-func TestProcessEMessageHappyPath2(t *testing.T) {
-	const (
-		name = "."
-	)
-
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
-	s.dir, _ = filepath.Abs("test")
-	s.openFile = nil
-	s.mkdir = nil
-
-	path, err := filepath.Abs(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.processEMessage(scpMessage{typ: "E"})
-	expect(t, nil, err)
-	expect(t, path, s.dir)
-	expect(t, "\x00", output.String())
-}
-
-func TestProcessEMessageHappyPath3(t *testing.T) {
-	const (
-		name = "."
-	)
-
-	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
-	s.dir, _ = filepath.Abs(".")
-	s.openFile = nil
-	s.mkdir = nil
-
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	path, _ := filepath.Split(wd)
-	path = filepath.Clean(path)
-
-	err = s.processEMessage(scpMessage{typ: "E"})
-	expect(t, nil, err)
-	expect(t, path, s.dir)
-	expect(t, "\x00", output.String())
 }

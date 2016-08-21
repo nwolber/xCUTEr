@@ -103,17 +103,6 @@ func (s *scpImp) run() error {
 	return err
 }
 
-type scpMessage struct {
-	typ    string
-	mode   os.FileMode
-	length uint64
-	name   string
-}
-
-func (msg scpMessage) String() string {
-	return fmt.Sprintf("%s%04o %d %s\n", msg.typ, uint32(msg.mode), msg.length, msg.name)
-}
-
 func ack(out io.Writer) {
 	out.Write([]byte{0})
 }
@@ -124,4 +113,10 @@ func filePath(commandPath, filePath string) string {
 	}
 
 	return commandPath
+}
+
+type scpMessage interface {
+	fmt.Stringer
+	binders() []binder
+	process(s *scpImp) error
 }
