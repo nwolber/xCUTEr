@@ -69,29 +69,29 @@ func TestTransferError(t *testing.T) {
 func TestTransferRecursive(t *testing.T) {
 	var (
 		dir1 = scpMessage{
-			typ:      "D",
-			fileMode: os.FileMode(0775),
-			fileName: "myDir",
+			typ:  "D",
+			mode: os.FileMode(0775),
+			name: "myDir",
 		}
 
 		file1 = scpMessage{
-			typ:      "C",
-			fileMode: os.FileMode(0664),
-			length:   23,
-			fileName: "file1.txt",
+			typ:    "C",
+			mode:   os.FileMode(0664),
+			length: 23,
+			name:   "file1.txt",
 		}
 
 		dir2 = scpMessage{
-			typ:      "D",
-			fileMode: os.FileMode(0775),
-			fileName: "nestedDir",
+			typ:  "D",
+			mode: os.FileMode(0775),
+			name: "nestedDir",
 		}
 
 		file2 = scpMessage{
-			typ:      "C",
-			fileMode: os.FileMode(0664),
-			length:   24,
-			fileName: "file2.txt",
+			typ:    "C",
+			mode:   os.FileMode(0664),
+			length: 24,
+			name:   "file2.txt",
 		}
 		out, file bytes.Buffer
 	)
@@ -112,8 +112,8 @@ func TestTransferRecursive(t *testing.T) {
 		name string
 		mode os.FileMode
 	}{
-		{"../test/myDir/" + file1.fileName, file1.fileMode},
-		{"../test/myDir/nestedDir/" + file2.fileName, file2.fileMode},
+		{"../test/myDir/" + file1.name, file1.mode},
+		{"../test/myDir/nestedDir/" + file2.name, file2.mode},
 	}
 	i := 0
 	s.openFile = func(name string, flags int, mode os.FileMode) (io.WriteCloser, error) {
@@ -167,9 +167,9 @@ func TestInvalidFileMode(t *testing.T) {
 func TestHappyPath(t *testing.T) {
 	msg, err := parseSCPMessage([]byte("C0666 19 index.html\n"), false)
 	expect(t, nil, err)
-	expect(t, os.FileMode(0666), msg.fileMode)
+	expect(t, os.FileMode(0666), msg.mode)
 	expect(t, uint64(19), msg.length)
-	expect(t, "index.html", msg.fileName)
+	expect(t, "index.html", msg.name)
 }
 
 func TestHappyPathEMessage(t *testing.T) {
@@ -238,10 +238,10 @@ func TestProcessDMessageHappyPath(t *testing.T) {
 	}
 
 	msg := scpMessage{
-		typ:      "D",
-		fileMode: fileMode,
-		length:   0,
-		fileName: fileName,
+		typ:    "D",
+		mode:   fileMode,
+		length: 0,
+		name:   fileName,
 	}
 
 	path, err := filepath.Abs(fileName)
@@ -278,10 +278,10 @@ func TestProcessDMessageHappyPath2(t *testing.T) {
 	}
 
 	msg := scpMessage{
-		typ:      "D",
-		fileMode: filePerm,
-		length:   0,
-		fileName: "myDir",
+		typ:    "D",
+		mode:   filePerm,
+		length: 0,
+		name:   "myDir",
 	}
 
 	path, err := filepath.Abs(wantFileName)
@@ -301,10 +301,10 @@ func TestProcessDMessageInvalidLength(t *testing.T) {
 	var output bytes.Buffer
 	s, _ := scp("scp -t -r .", nil, &output)
 	msg := scpMessage{
-		typ:      "D",
-		fileMode: os.FileMode(0222),
-		length:   42,
-		fileName: "test",
+		typ:    "D",
+		mode:   os.FileMode(0222),
+		length: 42,
+		name:   "test",
 	}
 	err := s.processDMessage(msg)
 	expect(t, errInvalidLength, err)
@@ -378,5 +378,3 @@ func TestProcessEMessageHappyPath3(t *testing.T) {
 	expect(t, path, s.dir)
 	expect(t, "\x00", output.String())
 }
-
-

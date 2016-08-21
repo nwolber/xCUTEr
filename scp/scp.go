@@ -21,7 +21,6 @@ const (
 
 var (
 	errInvalidLength = errors.New("invalid length")
-	// errInvalidRune   = errors.New("invalid rune")
 )
 
 func args(command string) (name string, recursive, transfer, source, verbose bool, err error) {
@@ -59,7 +58,7 @@ func New(command string, in io.Reader, out io.Writer) error {
 	return s.run()
 }
 
-func scp(command string, stdin io.Reader, stdout io.Writer) (*scpImp, error) {
+func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	var (
 		s   scpImp
 		err error
@@ -74,21 +73,20 @@ func scp(command string, stdin io.Reader, stdout io.Writer) (*scpImp, error) {
 		return nil, err
 	}
 	s.dir = path
-	s.in = bufio.NewReader(stdin)
-	s.out = stdout
+	s.in = bufio.NewReader(in)
+	s.out = out
 
 	s.openFile = func(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
 		return os.OpenFile(name, flag, perm)
 	}
-	s.mkdir = os.Mkdir
+	s.mkdir = os.MkdirAll
 
 	output := ioutil.Discard
-
 	if s.verbose {
 		output = os.Stderr
 	}
 
-	s.l = log.New(output, "scp", log.Flags())
+	s.l = log.New(output, "scp ", log.Flags())
 
 	return &s, nil
 }
@@ -100,20 +98,20 @@ func (s *scpImp) run() error {
 	}
 
 	if err != nil {
-		fmt.Fprintf(s.out, "\x01%s", err)
+		fmt.Fprintf(s.out, "\x02%s", err)
 	}
 	return err
 }
 
 type scpMessage struct {
-	typ      string
-	fileMode os.FileMode
-	length   uint64
-	fileName string
+	typ    string
+	mode   os.FileMode
+	length uint64
+	name   string
 }
 
 func (msg scpMessage) String() string {
-	return fmt.Sprintf("%s%04o %d %s\n", msg.typ, uint32(msg.fileMode), msg.length, msg.fileName)
+	return fmt.Sprintf("%s%04o %d %s\n", msg.typ, uint32(msg.mode), msg.length, msg.name)
 }
 
 func ack(out io.Writer) {

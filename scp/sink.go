@@ -77,8 +77,8 @@ func parseSCPMessage(input []byte, recursive bool) (scpMessage, error) {
 func (s *scpImp) processCMessage(msg scpMessage) error {
 	s.l.Printf("received C-message %s", msg)
 
-	path := filepath.Join(filePath(s.dir, msg.fileName), msg.fileName)
-	f, err := s.openFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, msg.fileMode)
+	path := filepath.Join(filePath(s.dir, msg.name), msg.name)
+	f, err := s.openFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, msg.mode)
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,10 @@ func (s *scpImp) processDMessage(msg scpMessage) error {
 		return errInvalidLength
 	}
 
-	s.dir = filepath.Join(s.dir, msg.fileName)
-
-	s.mkdir(s.dir, msg.fileMode)
+	s.dir = filepath.Join(s.dir, msg.name)
+	if err := s.mkdir(s.dir, msg.mode); err != nil {
+		return err
+	}
 
 	ack(s.out)
 
@@ -145,7 +146,7 @@ func binders(m *scpMessage) []binder {
 	return []binder{
 		binder{itemPerm, func(val string) (err error) {
 			mode, err := strconv.ParseUint(val, 8, 32)
-			m.fileMode = os.FileMode(mode)
+			m.mode = os.FileMode(mode)
 			return
 		}},
 		binder{itemSize, func(val string) (err error) {
@@ -153,7 +154,7 @@ func binders(m *scpMessage) []binder {
 			return
 		}},
 		binder{itemName, func(val string) error {
-			m.fileName = val
+			m.name = val
 			return nil
 		}},
 		binder{itemEnd, func(val string) error { return nil }},
