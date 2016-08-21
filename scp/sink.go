@@ -263,6 +263,10 @@ func parseSCPMessage(input []byte) (scpMessage, error) {
 	return m, nil
 }
 
+func ack(out io.Writer) {
+	out.Write([]byte{0})
+}
+
 type binder struct {
 	typ  itemType
 	bind func(string) error
