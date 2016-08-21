@@ -163,7 +163,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) SCP(scp *scp) interface{} {
+func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
@@ -256,10 +256,10 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 		)
 		for ; i < retries; i++ {
 			childCtx, err = f(ctx)
-			if err != nil {
-				l.Println("retrying, previous attempt failed:", err)
-				continue
+			if err == nil {
+				break
 			}
+			l.Println("retrying, previous attempt failed:", err)
 		}
 
 		return childCtx, err

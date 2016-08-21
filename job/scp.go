@@ -6,6 +6,7 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -14,7 +15,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"context"
+	"github.com/nwolber/xCUTEr/scp"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -153,6 +154,52 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 }
 
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
+	if strings.Contains(string(req.Payload), "-f") {
+		oldSCP(ctx, channel, req, verbose)
+	} else {
+		newSCP(ctx, channel, req)
+	}
+}
+
+func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
+	defer channel.Close()
+
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
+	parts := strings.Split(string(req.Payload), " ")
+	exe := parts[0][4:]
+
+	if exe != "scp" {
+		l.Println("remote requested", exe, "denying")
+		req.Reply(false, nil)
+		return
+	}
+
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	exitCode := 0
+	err := scp.New(string(req.Payload[4:]), channel, channel)
+	if err != nil {
+		l.Println("error during scp transfer", err)
+		exitCode = 1
+	}
+
+	var buf bytes.Buffer
+	if err := binary.Write(&buf, binary.BigEndian, int32(exitCode)); err != nil {
+		l.Println("unable to convert int32 to byte")
+		return
+	}
+	channel.SendRequest("exit-status", false, buf.Bytes())
+}
+
+func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
 	defer channel.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
@@ -199,4 +246,13 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 		return
 	}
 	channel.SendRequest("exit-status", false, buf.Bytes())
+}
+
+type bla struct {
+	dir string
+}
+
+func (x *bla) Write(b []byte) (int, error) {
+	log.Printf("!!!!!!!!!!!!!!!!!!!! %s: %q", x.dir, string(b))
+	return len(b), nil
 }

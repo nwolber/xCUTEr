@@ -31,7 +31,7 @@ type configVisitor interface {
 	JobLogger(jobName string) interface{}
 	HostLogger(jobName string, h *host) interface{}
 	Timeout(timeout time.Duration) interface{}
-	SCP(scp *scp) interface{}
+	SCP(scp *scpData) interface{}
 	Hosts() group
 	Host(c *Config, h *host) group
 	ErrorSafeguard(child interface{}) interface{}
