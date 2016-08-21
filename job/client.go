@@ -15,7 +15,6 @@ import (
 
 	"context"
 
-	"github.com/nwolber/xCUTEr/flow"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -212,16 +211,16 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 		l.Printf("failed to start: %q, %s", command, err)
 	}
 
-	done := flow.New()
+	done := make(chan error)
 	go func() {
-		done.Complete(session.Wait())
+		done <- session.Wait()
 	}()
 
 	select {
 	case <-ctx.Done():
 		l.Println("closing session, context done")
 		return nil
-	case err, _ := <-done.Chan():
+	case err, _ := <-done:
 		if err != nil {
 			l.Printf("executing %q failed: %s", command, err)
 			return err
