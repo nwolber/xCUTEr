@@ -6,16 +6,14 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
-
-	"context"
 
 	"github.com/nwolber/xCUTEr/scp"
 
@@ -224,15 +222,9 @@ func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose 
 	default:
 	}
 
-	log.Println("!!!!!!!!!!!!!!!!!!!!", string(req.Payload))
-
 	cmd := exec.Command(exe, parts[1:]...)
-	// cmd.Stdin = channel
-	// cmd.Stdout = channel
-	var input bytes.Buffer
-	var output bytes.Buffer
-	cmd.Stdin = io.TeeReader(channel, &bla{dir: "input"})
-	cmd.Stdout = io.MultiWriter(channel, &bla{dir: "output"})
+	cmd.Stdin = channel
+	cmd.Stdout = channel
 
 	if verbose {
 		cmd.Stderr = os.Stderr
@@ -247,9 +239,6 @@ func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose 
 	} else {
 		l.Println(exe, "completed successfully")
 	}
-
-	log.Printf("!!!!!!!!!!!!!!!!!!!! input: %q", input.String())
-	log.Printf("!!!!!!!!!!!!!!!!!!!! output: %q", output.String())
 
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.BigEndian, int32(exitCode)); err != nil {
