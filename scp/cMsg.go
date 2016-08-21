@@ -37,11 +37,11 @@ func (m *scpCMessage) binders() []binder {
 	}
 }
 
-func (msg *scpCMessage) process(s *scpImp) error {
-	s.l.Printf("received C-message %s", msg)
+func (m *scpCMessage) process(s *scpImp) error {
+	s.l.Printf("received C-message %s", m)
 
-	path := filepath.Join(filePath(s.dir, msg.name), msg.name)
-	f, err := s.openFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, msg.mode)
+	path := filepath.Join(filePath(s.dir, m.name), m.name)
+	f, err := s.openFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, m.mode)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (msg *scpCMessage) process(s *scpImp) error {
 	ack(s.out)
 
 	// TODO: read from underlying reader without buffering
-	fileReader := io.LimitReader(s.in, int64(msg.length))
+	fileReader := io.LimitReader(s.in, int64(m.length))
 	io.Copy(f, fileReader)
 
 	r, err := s.in.ReadByte()

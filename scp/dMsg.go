@@ -36,15 +36,15 @@ func (m *scpDMessage) binders() []binder {
 	}
 }
 
-func (msg scpDMessage) process(s *scpImp) error {
-	s.l.Printf("received D-message %s", msg)
+func (m scpDMessage) process(s *scpImp) error {
+	s.l.Printf("received D-message %s", m)
 
-	if msg.length != 0 {
+	if m.length != 0 {
 		return errInvalidLength
 	}
 
-	s.dir = filepath.Join(s.dir, msg.name)
-	if err := s.mkdir(s.dir, msg.mode); err != nil {
+	s.dir = filepath.Join(s.dir, m.name)
+	if err := s.mkdir(s.dir, m.mode); err != nil {
 		return err
 	}
 

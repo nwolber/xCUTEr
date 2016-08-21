@@ -15,8 +15,8 @@ func (m *scpEMessage) binders() []binder {
 	}
 }
 
-func (msg scpEMessage) process(s *scpImp) error {
-	s.l.Printf("received E-message %s", msg)
+func (m scpEMessage) process(s *scpImp) error {
+	s.l.Printf("received E-message %s", m)
 
 	s.dir, _ = filepath.Split(s.dir)
 	s.dir = filepath.Clean(s.dir)
