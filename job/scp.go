@@ -156,8 +156,11 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 }
 
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
-	// oldSCP(ctx, channel, req, verbose)
-	newSCP(ctx, channel, req)
+	if strings.Contains(string(req.Payload), "-f") {
+		oldSCP(ctx, channel, req, verbose)
+	} else {
+		newSCP(ctx, channel, req)
+	}
 }
 
 func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
