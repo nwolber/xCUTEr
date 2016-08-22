@@ -7,7 +7,6 @@ package job
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"regexp"
@@ -48,7 +47,7 @@ func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 		log.Panicln(err)
 	}
 
-	return f.(Stringer).String(&vars{
+	return f.(stringer).String(&vars{
 		&templatingEngine{
 			Config: c,
 			now: func() time.Time {
@@ -102,7 +101,7 @@ type scpData struct {
 type command struct {
 	Name     string     `json:"name,omitempty"`
 	Command  string     `json:"command,omitempty"`
-	Commands []*command `json:"commands,omitempty`
+	Commands []*command `json:"commands,omitempty"`
 	Flow     string     `json:"flow,omitempty"`
 	Target   string     `json:"target,omitempty"`
 	Retries  uint       `json:"retries,omitempty"`
@@ -110,9 +109,9 @@ type command struct {
 	Stderr   string     `json:"stderr,omitempty"`
 }
 
-func (c *command) String() string {
-	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q")
-}
+// func (c *command) String() string {
+// 	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q", c.Command)
+// }
 
 // ReadConfig parses the file into a Config.
 func ReadConfig(file string) (*Config, error) {

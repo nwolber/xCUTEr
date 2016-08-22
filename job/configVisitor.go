@@ -169,25 +169,9 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 			cmds = builder.Command(cmd)
 		}
 	} else if cmd.Commands != nil && len(cmd.Commands) > 0 {
-		var childCommands group
-
-		if cmd.Flow == sequentialFlow {
-			childCommands = builder.Sequential()
-		} else if cmd.Flow == parallelFlow {
-			childCommands = builder.Parallel()
-		} else {
-			err := fmt.Errorf("unknown flow %q", cmd.Flow)
-			log.Println(err)
+		childCommands, err := visitCommands(builder, cmd)
+		if err != nil {
 			return nil, err
-		}
-
-		for _, cmd := range cmd.Commands {
-			exec, err := visitCommand(builder, cmd)
-			if err != nil {
-				return nil, err
-			}
-
-			childCommands.Append(exec)
 		}
 
 		cmds = childCommands.Wrap()
@@ -207,4 +191,28 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 	}
 
 	return wrappedChildren, nil
+}
+
+func visitCommands(builder configVisitor, cmd *command) (group, error) {
+	var childCommands group
+
+	if cmd.Flow == sequentialFlow {
+		childCommands = builder.Sequential()
+	} else if cmd.Flow == parallelFlow {
+		childCommands = builder.Parallel()
+	} else {
+		err := fmt.Errorf("unknown flow %q", cmd.Flow)
+		log.Println(err)
+		return nil, err
+	}
+
+	for _, cmd := range cmd.Commands {
+		exec, err := visitCommand(builder, cmd)
+		if err != nil {
+			return nil, err
+		}
+
+		childCommands.Append(exec)
+	}
+	return childCommands, nil
 }

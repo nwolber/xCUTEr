@@ -6,6 +6,7 @@ package xCUTEr
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 	sched "github.com/nwolber/cron"
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
-	"context"
 )
 
 type jobInfo struct {
@@ -126,7 +126,7 @@ func parse(file string) (*jobInfo, error) {
 	}
 
 	start := time.Now()
-	f, err := c.ExecutionTree()
+	f, _ := c.ExecutionTree()
 	stop := time.Now()
 	log.Println("job preparation took", stop.Sub(start))
 

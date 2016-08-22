@@ -20,7 +20,7 @@ type vars struct {
 	tt *templatingEngine
 }
 
-type Stringer interface {
+type stringer interface {
 	String(v *vars) string
 }
 
@@ -42,7 +42,7 @@ func (s simple) String(v *vars) string {
 
 type multiple struct {
 	typ       string
-	stringers []Stringer
+	stringers []stringer
 	max       int
 	raw       bool
 }
@@ -53,7 +53,7 @@ func (s *multiple) Append(children ...interface{}) {
 			continue
 		}
 
-		f, ok := cc.(Stringer)
+		f, ok := cc.(stringer)
 		if !ok {
 			log.Panicf("not a Stringer %T", cc)
 		}
@@ -207,7 +207,7 @@ func (s *stringVisitor) Host(c *Config, h *host) group {
 }
 
 func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
-	stringer, ok := child.(Stringer)
+	str, ok := child.(stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
@@ -215,8 +215,8 @@ func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
 	if s.full {
 		return &multiple{
 			typ: "Error safeguard",
-			stringers: []Stringer{
-				stringer,
+			stringers: []stringer{
+				str,
 			},
 		}
 	}
@@ -224,7 +224,7 @@ func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
 }
 
 func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
-	stringer, ok := child.(Stringer)
+	str, ok := child.(stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
@@ -232,8 +232,8 @@ func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
 	if s.full {
 		return &multiple{
 			typ: "Context Bounds",
-			stringers: []Stringer{
-				stringer,
+			stringers: []stringer{
+				str,
 			},
 		}
 	}
@@ -241,15 +241,15 @@ func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
 }
 
 func (s *stringVisitor) Retry(child interface{}, retries uint) interface{} {
-	stringer, ok := child.(Stringer)
+	str, ok := child.(stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
 
 	return &multiple{
 		typ: fmt.Sprintf("Retry up to %d times", retries),
-		stringers: []Stringer{
-			stringer,
+		stringers: []stringer{
+			str,
 		},
 	}
 }

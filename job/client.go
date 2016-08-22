@@ -5,6 +5,7 @@
 package job
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,8 +13,6 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"context"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -135,7 +134,7 @@ func createClient(addr, user, keyFile, password string, keyboardInteractive map[
 
 		signer, err := ssh.NewSignerFromSigner(s)
 		if err != nil {
-			fmt.Errorf("Unable to turn signer into signer %s", err)
+			err = fmt.Errorf("Unable to turn signer into signer %s", err)
 			log.Println(err)
 			return nil, err
 		}

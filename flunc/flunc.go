@@ -52,6 +52,7 @@ func Parallel(children ...Flunc) Flunc {
 		done := make(chan error)
 
 		childCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		for _, child := range children {
 			if child == nil {
 				numChildren--
@@ -68,7 +69,7 @@ func Parallel(children ...Flunc) Flunc {
 		for i := 0; i < numChildren; i++ {
 			err = <-done
 			if err != nil {
-				cancel()
+				break
 			}
 		}
 

@@ -5,6 +5,7 @@
 package job
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -12,7 +13,6 @@ import (
 	"os"
 
 	"golang.org/x/crypto/ssh"
-	"context"
 )
 
 // forward instructs the connect SSH server to forward all connections attempts

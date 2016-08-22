@@ -5,6 +5,7 @@
 package job
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,8 +16,6 @@ import (
 	"time"
 
 	"github.com/nwolber/xCUTEr/flunc"
-
-	"context"
 )
 
 // ExecutionTree creates the execution tree necessary to executeCommand

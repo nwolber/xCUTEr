@@ -25,22 +25,22 @@ func (m scpCMessage) String() string {
 
 func (m *scpCMessage) binders() []binder {
 	return []binder{
-		binder{itemNumber, func(val string) (err error) {
+		{itemNumber, func(val string) (err error) {
 			mode, err := strconv.ParseUint(val, 8, 32)
 			m.mode = os.FileMode(mode)
 			return
 		}},
-		binder{itemSpace, nopBind},
-		binder{itemNumber, func(val string) (err error) {
+		{itemSpace, nopBind},
+		{itemNumber, func(val string) (err error) {
 			m.length, err = strconv.ParseUint(val, 10, 64)
 			return
 		}},
-		binder{itemSpace, nopBind},
-		binder{itemName, func(val string) error {
+		{itemSpace, nopBind},
+		{itemName, func(val string) error {
 			m.name = val
 			return nil
 		}},
-		binder{itemEnd, nopBind},
+		{itemEnd, nopBind},
 	}
 }
 
@@ -60,7 +60,7 @@ func (m *scpCMessage) process(s *scpImp) error {
 		// TODO: read from underlying reader without buffering
 		fileReader := io.LimitReader(s.in, int64(m.length))
 		n, err := io.Copy(f, fileReader)
-		s.l.Printf("transfered %d bytes", n)
+		s.l.Printf("transferred %d bytes", n)
 		return err
 	}()
 
@@ -98,22 +98,22 @@ func (m scpDMessage) String() string {
 
 func (m *scpDMessage) binders() []binder {
 	return []binder{
-		binder{itemNumber, func(val string) (err error) {
+		{itemNumber, func(val string) (err error) {
 			mode, err := strconv.ParseUint(val, 8, 32)
 			m.mode = os.FileMode(mode)
 			return
 		}},
-		binder{itemSpace, nopBind},
-		binder{itemNumber, func(val string) (err error) {
+		{itemSpace, nopBind},
+		{itemNumber, func(val string) (err error) {
 			m.length, err = strconv.ParseUint(val, 10, 64)
 			return
 		}},
-		binder{itemSpace, nopBind},
-		binder{itemName, func(val string) error {
+		{itemSpace, nopBind},
+		{itemName, func(val string) error {
 			m.name = val
 			return nil
 		}},
-		binder{itemEnd, func(val string) error { return nil }},
+		{itemEnd, func(val string) error { return nil }},
 	}
 }
 
@@ -148,7 +148,7 @@ func (m scpEMessage) String() string {
 
 func (m *scpEMessage) binders() []binder {
 	return []binder{
-		binder{itemEnd, func(val string) error { return nil }},
+		{itemEnd, func(val string) error { return nil }},
 	}
 }
 
@@ -174,23 +174,23 @@ func (m scpTMessage) String() string {
 func (m *scpTMessage) binders() []binder {
 	return []binder{
 		// mTime
-		binder{itemNumber, func(val string) (err error) {
+		{itemNumber, func(val string) (err error) {
 			m.mTime, err = parseUnix(val)
 			return
 		}},
-		binder{itemSpace, nopBind},
+		{itemSpace, nopBind},
 		// mTime nanoseconds, always 0
-		binder{itemNumber, nopBind},
-		binder{itemSpace, nopBind},
+		{itemNumber, nopBind},
+		{itemSpace, nopBind},
 		// aTime
-		binder{itemNumber, func(val string) (err error) {
+		{itemNumber, func(val string) (err error) {
 			m.aTime, err = parseUnix(val)
 			return
 		}},
-		binder{itemSpace, nopBind},
+		{itemSpace, nopBind},
 		// aTime nanoseconds, always 0
-		binder{itemNumber, nopBind},
-		binder{itemEnd, nopBind},
+		{itemNumber, nopBind},
+		{itemEnd, nopBind},
 	}
 }
 

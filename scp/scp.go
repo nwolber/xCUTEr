@@ -55,6 +55,7 @@ type scpImp struct {
 	chtimes          func(name string, aTime, mTime time.Time) error
 }
 
+// New starts a new SCP file transfer.
 func New(command string, in io.Reader, out io.Writer) error {
 	s, err := scp(command, in, out)
 	if err != nil {

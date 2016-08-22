@@ -5,11 +5,10 @@
 package job
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
-
-	"context"
 )
 
 type acceptMsg struct {

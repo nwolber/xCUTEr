@@ -5,13 +5,12 @@
 package xCUTEr
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-
-	"context"
 )
 
 type watcher struct {
