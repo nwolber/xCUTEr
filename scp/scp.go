@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/djherbis/atime"
 )
 
 var (
@@ -30,14 +32,22 @@ func args(command string) (name string, recursive, transfer, source, verbose, ti
 	}
 
 	set := flag.NewFlagSet(parts[0], flag.ContinueOnError)
-	set.BoolVar(&recursive, "r", false, "")
-	set.BoolVar(&transfer, "t", false, "")
-	set.BoolVar(&source, "f", false, "")
-	set.BoolVar(&verbose, "v", false, "")
-	set.BoolVar(&times, "p", false, "")
+	set.BoolVar(&recursive, "r", false, "recursive")
+	set.BoolVar(&transfer, "t", false, "sink mode")
+	set.BoolVar(&source, "f", false, "source mode")
+	set.BoolVar(&verbose, "v", false, "verbose")
+	set.BoolVar(&times, "p", false, "include access and modification timestamps")
+	set.Bool("d", false, "dummy value, currently ignored")
 	err = set.Parse(parts[1:])
+
 	name = set.Arg(0)
 	return
+}
+
+type readWriteCloser interface {
+	io.Reader
+	io.Writer
+	io.Closer
 }
 
 type scpImp struct {
@@ -50,11 +60,14 @@ type scpImp struct {
 	l                *log.Logger
 	mTime, aTime     time.Time
 	timeSet          bool
-	openFile         func(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
+	openFile         func(name string, flag int, perm os.FileMode) (readWriteCloser, error)
 	mkdir            func(name string, perm os.FileMode) error
 	chtimes          func(name string, aTime, mTime time.Time) error
+	stat             func(name string) (fileInfo, error)
+	readDir          func(name string) ([]fileInfo, error)
 }
 
+// New starts a new SCP file transfer.
 func New(command string, in io.Reader, out io.Writer) error {
 	s, err := scp(command, in, out)
 	if err != nil {
@@ -81,11 +94,13 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	s.in = bufio.NewReader(in)
 	s.out = out
 
-	s.openFile = func(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+	s.openFile = func(name string, flag int, perm os.FileMode) (readWriteCloser, error) {
 		return os.OpenFile(name, flag, perm)
 	}
 	s.mkdir = os.MkdirAll
 	s.chtimes = os.Chtimes
+	s.stat = stat
+	s.readDir = readDir
 
 	output := ioutil.Discard
 	if s.verbose {
@@ -98,20 +113,69 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	return &s, nil
 }
 
+type fileInfo struct {
+	name         string
+	mode         os.FileMode
+	mTime, aTime time.Time
+	size         int64
+	isDir        bool
+}
+
 func (s *scpImp) run() error {
 	var err error
+	if s.sink && s.source {
+		return errors.New("either -f or -t can be specified")
+	}
+
 	if s.sink {
 		err = s.runSink()
+	} else if s.source {
+		err = s.runSource()
+	} else {
+		return errors.New("either -f or -t has to be specified")
 	}
 
 	if err != nil {
-		fmt.Fprintf(s.out, "\x02%s", err)
+		fmt.Fprintf(s.out, "\x02%s\n", err)
 	}
 	return err
 }
 
-func ack(out io.Writer) {
-	out.Write([]byte{0})
+func stat(name string) (fileInfo, error) {
+	f, err := os.Stat(name)
+	var fi fileInfo
+	if err != nil {
+		return fi, err
+	}
+	fi.aTime = atime.Get(f)
+
+	fi.mode = f.Mode()
+	fi.mTime = f.ModTime()
+	fi.name = f.Name()
+	fi.size = f.Size()
+	fi.isDir = f.IsDir()
+	return fi, nil
+}
+
+func readDir(name string) ([]fileInfo, error) {
+	f, err := ioutil.ReadDir(name)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]fileInfo, len(f))
+	for i := 0; i < len(f); i++ {
+		fi := f[i]
+		files[i] = fileInfo{
+			aTime: atime.Get(fi),
+			isDir: fi.IsDir(),
+			mode:  fi.Mode(),
+			mTime: fi.ModTime(),
+			name:  fi.Name(),
+			size:  fi.Size(),
+		}
+	}
+	return files, nil
 }
 
 func filePath(commandPath, filePath string) string {

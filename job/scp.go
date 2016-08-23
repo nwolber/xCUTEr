@@ -122,30 +122,7 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 				continue
 			}
 
-			go func(ctx context.Context, in <-chan *ssh.Request) {
-				for {
-					select {
-					case req, ok := <-in:
-						if !ok {
-							return
-						}
-
-						if verbose {
-							l.Printf("%q requested: %q", req.Type, req.Payload)
-						}
-						switch req.Type {
-						case "exec":
-							go handleExecRequest(ctx, channel, req, verbose)
-						default:
-							req.Reply(false, nil)
-						}
-
-					case <-ctx.Done():
-						return
-					}
-				}
-			}(ctx, requests)
-
+			go serveRequests(ctx, channel, requests, verbose)
 		case <-ctx.Done():
 			return
 		}
@@ -153,15 +130,36 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 	l.Println("handleSSHConnection: connection closed")
 }
 
-func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
-	if strings.Contains(string(req.Payload), "-f") {
-		oldSCP(ctx, channel, req, verbose)
-	} else {
-		newSCP(ctx, channel, req)
+func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Request, verbose bool) {
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
+	for {
+		select {
+		case req, ok := <-in:
+			if !ok {
+				return
+			}
+
+			if verbose {
+				l.Printf("%q requested: %q", req.Type, req.Payload)
+			}
+			switch req.Type {
+			case "exec":
+				go handleExecRequest(ctx, channel, req, verbose)
+			default:
+				req.Reply(false, nil)
+			}
+
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
-func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
+func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
 	defer channel.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)

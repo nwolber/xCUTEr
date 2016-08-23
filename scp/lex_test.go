@@ -112,13 +112,13 @@ func TestLexReaderBackup(t *testing.T) {
 func TestLexerNew(t *testing.T) {
 	_, c := lex([]byte("C0664 19 index.html\n"))
 	want := []item{
-		item{itemTyp, "C", 1},
-		item{itemNumber, "0664", 5},
-		item{itemSpace, " ", 6},
-		item{itemNumber, "19", 8},
-		item{itemSpace, " ", 9},
-		item{itemName, "index.html", 19},
-		item{itemEnd, "\n", 20},
+		{itemTyp, "C", 1},
+		{itemNumber, "0664", 5},
+		{itemSpace, " ", 6},
+		{itemNumber, "19", 8},
+		{itemSpace, " ", 9},
+		{itemName, "index.html", 19},
+		{itemEnd, "\n", 20},
 	}
 
 	for _, item := range want {

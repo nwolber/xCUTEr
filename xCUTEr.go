@@ -5,6 +5,7 @@
 package xCUTEr
 
 import (
+	"context"
 	"log"
 	"os"
 	"sync/atomic"
@@ -12,10 +13,10 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/nwolber/xCUTEr/job"
-	"context"
 )
 
-type xcuter struct {
+// XCUTEr contains the main logic for xCUTEr
+type XCUTEr struct {
 	Start, Stop, Cancel func()
 	Done                <-chan struct{}
 	Inactive, Scheduled func() []*schedInfo
@@ -24,7 +25,8 @@ type xcuter struct {
 	SetMaxCompleted     func(uint32)
 }
 
-func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *xcuter {
+// New creates a new xCUTEr with the given config options.
+func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *XCUTEr {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
 	if logFile != "" {
@@ -91,7 +93,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 		}()
 	}
 
-	return &xcuter{
+	return &XCUTEr{
 		Done:            mainCtx.Done(),
 		Cancel:          mainCancel,
 		Start:           e.Start,

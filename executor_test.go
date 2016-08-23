@@ -5,6 +5,7 @@
 package xCUTEr
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,8 +13,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"context"
 
 	"github.com/nwolber/xCUTEr/job"
 )

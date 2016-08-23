@@ -5,11 +5,10 @@
 package flunc
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
-
-	"context"
 )
 
 var (
