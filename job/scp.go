@@ -160,14 +160,6 @@ func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Requ
 }
 
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
-	if strings.Contains(string(req.Payload), "-f") {
-		oldSCP(ctx, channel, req, verbose)
-	} else {
-		newSCP(ctx, channel, req)
-	}
-}
-
-func newSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request) {
 	defer channel.Close()
 
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
