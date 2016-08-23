@@ -30,12 +30,14 @@ func args(command string) (name string, recursive, transfer, source, verbose, ti
 	}
 
 	set := flag.NewFlagSet(parts[0], flag.ContinueOnError)
-	set.BoolVar(&recursive, "r", false, "")
-	set.BoolVar(&transfer, "t", false, "")
-	set.BoolVar(&source, "f", false, "")
-	set.BoolVar(&verbose, "v", false, "")
-	set.BoolVar(&times, "p", false, "")
+	set.BoolVar(&recursive, "r", false, "recursive")
+	set.BoolVar(&transfer, "t", false, "sink mode")
+	set.BoolVar(&source, "f", false, "source mode")
+	set.BoolVar(&verbose, "v", false, "verbose")
+	set.BoolVar(&times, "p", false, "include access and modification timestamps")
+	set.Bool("d", false, "dummy value, currently ignored")
 	err = set.Parse(parts[1:])
+
 	name = set.Arg(0)
 	return
 }
