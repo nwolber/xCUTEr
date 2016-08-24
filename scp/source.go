@@ -149,7 +149,7 @@ func (s *scpImp) sendFile(f fileInfo) error {
 	if err != nil {
 		return err
 	}
-	s.l.Printf("%d bytes transfered", n)
+	s.l.Printf("%d bytes transferred", n)
 
 	if _, err = fmt.Fprint(s.out, "\x00"); err != nil {
 		return err

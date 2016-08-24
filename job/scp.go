@@ -86,11 +86,12 @@ func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) er
 
 func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.ServerConfig, verbose bool) {
 	defer nConn.Close()
-
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
+
+	defer l.Println("handleSSHConnection: connection closed")
 
 	_, chans, reqs, err := ssh.NewServerConn(nConn, config)
 	if err != nil {
@@ -127,7 +128,6 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 			return
 		}
 	}
-	l.Println("handleSSHConnection: connection closed")
 }
 
 func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Request, verbose bool) {
