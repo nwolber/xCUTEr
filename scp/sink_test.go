@@ -63,7 +63,7 @@ func TestTransfer(t *testing.T) {
 		t.Logf("%q", tt.msg)
 		in := bytes.NewBufferString(tt.msg)
 
-		s, _ := scp(tt.cmd, in, &out)
+		s, _ := scp(tt.cmd, in, &out, false)
 		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 			path, err := filepath.Abs(fileName)
 			if err != nil {
@@ -99,7 +99,7 @@ func TestTransferError(t *testing.T) {
 	t.Logf("%q", input)
 	in := bytes.NewBufferString(input)
 
-	s, _ := scp("scp -t .", in, &out)
+	s, _ := scp("scp -t .", in, &out, false)
 	s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 		return nil, errorMessage
 	}
@@ -178,7 +178,7 @@ func TestTransferRecursive(t *testing.T) {
 		in := bytes.NewBufferString(tt.msg)
 
 		var out, file bytes.Buffer
-		s, _ := scp(tt.cmd, in, &out)
+		s, _ := scp(tt.cmd, in, &out, false)
 		files := []struct {
 			name string
 			mode os.FileMode

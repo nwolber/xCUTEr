@@ -62,15 +62,15 @@ type scpImp struct {
 }
 
 // New starts a new SCP file transfer.
-func New(command string, in io.Reader, out io.Writer) error {
-	s, err := scp(command, in, out)
+func New(command string, in io.Reader, out io.Writer, verbose bool) error {
+	s, err := scp(command, in, out, verbose)
 	if err != nil {
 		return err
 	}
 	return s.run()
 }
 
-func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
+func scp(command string, in io.Reader, out io.Writer, verbose bool) (*scpImp, error) {
 	var (
 		s   scpImp
 		err error
@@ -79,6 +79,8 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	s.verbose = s.verbose || verbose
 
 	path, err := filepath.Abs(s.name)
 	if err != nil {

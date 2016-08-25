@@ -103,7 +103,7 @@ func TestSimpleTransfer(t *testing.T) {
 
 	for _, tt := range tests {
 		var out bytes.Buffer
-		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out)
+		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out, false)
 		expect(t, nil, err)
 
 		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
@@ -227,7 +227,7 @@ func TestRecursiveTransfer(t *testing.T) {
 
 	for _, tt := range tests {
 		var out bytes.Buffer
-		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out)
+		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out, false)
 		expect(t, nil, err)
 
 		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {

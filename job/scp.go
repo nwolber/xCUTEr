@@ -183,7 +183,7 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 	}
 
 	exitCode := 0
-	err := scp.New(string(req.Payload[4:]), channel, channel)
+	err := scp.New(string(req.Payload[4:]), channel, channel, verbose)
 	if err != nil {
 		l.Println("error during scp transfer", err)
 		exitCode = 1
