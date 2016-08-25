@@ -29,7 +29,7 @@ func (s *scpImp) sourceRecurse() error {
 		return err
 	}
 
-	if f.isDir {
+	if f.IsDir() {
 		return s.sendDirectory(f)
 	}
 	return s.sendFile(f)
@@ -41,14 +41,14 @@ func (s *scpImp) sourceNoRecurse() error {
 		return err
 	}
 
-	if f.isDir {
+	if f.IsDir() {
 		return fmt.Errorf("%s is not a regular file", s.name)
 	}
 
 	return s.sendFile(f)
 }
 
-func (s *scpImp) sendDirectory(f fileInfo) error {
+func (s *scpImp) sendDirectory(f FileInfo) error {
 	if s.times {
 		if err := s.sendFileTimes(f); err != nil {
 			return err
@@ -56,8 +56,8 @@ func (s *scpImp) sendDirectory(f fileInfo) error {
 	}
 
 	msg := &scpDMessage{
-		name: f.name,
-		mode: f.mode & os.ModePerm,
+		name: f.Name(),
+		mode: f.Mode() & os.ModePerm,
 	}
 	s.l.Printf("sending D message: %s", msg)
 
@@ -75,8 +75,8 @@ func (s *scpImp) sendDirectory(f fileInfo) error {
 	}
 
 	for _, fi := range files {
-		if fi.isDir {
-			s.dir = filepath.Join(s.dir, fi.name)
+		if fi.IsDir() {
+			s.dir = filepath.Join(s.dir, fi.Name())
 			if err := s.sendDirectory(fi); err != nil {
 				return err
 			}
@@ -102,10 +102,10 @@ func (s *scpImp) sendDirectory(f fileInfo) error {
 	return nil
 }
 
-func (s *scpImp) sendFileTimes(f fileInfo) error {
+func (s *scpImp) sendFileTimes(f FileInfo) error {
 	msg := &scpTMessage{
-		aTime: f.aTime,
-		mTime: f.mTime,
+		aTime: f.AccessTime(),
+		mTime: f.ModTime(),
 	}
 	s.l.Printf("sending T message: %s", msg)
 	if _, err := fmt.Fprint(s.out, msg); err != nil {
@@ -118,7 +118,7 @@ func (s *scpImp) sendFileTimes(f fileInfo) error {
 	return nil
 }
 
-func (s *scpImp) sendFile(f fileInfo) error {
+func (s *scpImp) sendFile(f FileInfo) error {
 	if s.times {
 		if err := s.sendFileTimes(f); err != nil {
 			return err
@@ -126,9 +126,9 @@ func (s *scpImp) sendFile(f fileInfo) error {
 	}
 
 	msg := &scpCMessage{
-		name:   f.name,
-		mode:   f.mode & os.ModePerm,
-		length: uint64(f.size),
+		name:   f.Name(),
+		mode:   f.Mode() & os.ModePerm,
+		length: uint64(f.Size()),
 	}
 	s.l.Printf("sending C message: %s", msg)
 
@@ -140,7 +140,7 @@ func (s *scpImp) sendFile(f fileInfo) error {
 		return err
 	}
 
-	file, err := s.openFile(path(s.dir, f.name), os.O_RDONLY, 0)
+	file, err := s.openFile(path(s.dir, f.Name()), os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}

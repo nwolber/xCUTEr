@@ -44,12 +44,6 @@ func args(command string) (name string, recursive, transfer, source, verbose, ti
 	return
 }
 
-type readWriteCloser interface {
-	io.Reader
-	io.Writer
-	io.Closer
-}
-
 type scpImp struct {
 	name, dir        string
 	sink, source     bool
@@ -60,11 +54,11 @@ type scpImp struct {
 	l                *log.Logger
 	mTime, aTime     time.Time
 	timeSet          bool
-	openFile         func(name string, flag int, perm os.FileMode) (readWriteCloser, error)
+	openFile         func(name string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 	mkdir            func(name string, perm os.FileMode) error
 	chtimes          func(name string, aTime, mTime time.Time) error
-	stat             func(name string) (fileInfo, error)
-	readDir          func(name string) ([]fileInfo, error)
+	stat             func(name string) (FileInfo, error)
+	readDir          func(name string) ([]FileInfo, error)
 }
 
 // New starts a new SCP file transfer.
@@ -94,9 +88,7 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	s.in = bufio.NewReader(in)
 	s.out = out
 
-	s.openFile = func(name string, flag int, perm os.FileMode) (readWriteCloser, error) {
-		return os.OpenFile(name, flag, perm)
-	}
+	s.openFile = openFile
 	s.mkdir = os.MkdirAll
 	s.chtimes = os.Chtimes
 	s.stat = stat
@@ -111,14 +103,6 @@ func scp(command string, in io.Reader, out io.Writer) (*scpImp, error) {
 	s.l.Println(command)
 
 	return &s, nil
-}
-
-type fileInfo struct {
-	name         string
-	mode         os.FileMode
-	mTime, aTime time.Time
-	size         int64
-	isDir        bool
 }
 
 func (s *scpImp) run() error {
@@ -141,38 +125,46 @@ func (s *scpImp) run() error {
 	return err
 }
 
-func stat(name string) (fileInfo, error) {
-	f, err := os.Stat(name)
-	var fi fileInfo
-	if err != nil {
-		return fi, err
-	}
-	fi.aTime = atime.Get(f)
-
-	fi.mode = f.Mode()
-	fi.mTime = f.ModTime()
-	fi.name = f.Name()
-	fi.size = f.Size()
-	fi.isDir = f.IsDir()
-	return fi, nil
+type fileInfo struct {
+	os.FileInfo
 }
 
-func readDir(name string) ([]fileInfo, error) {
+func (f *fileInfo) AccessTime() time.Time {
+	return atime.Get(f.FileInfo)
+}
+
+// FileInfo provides informations about a file system object,
+// like files or directories.
+type FileInfo interface {
+	os.FileInfo
+	AccessTime() time.Time
+}
+
+func openFile(name string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
+func stat(name string) (FileInfo, error) {
+	f, err := os.Stat(name)
+	if err != nil {
+		return nil, err
+	}
+	fi := fileInfo{
+		FileInfo: f,
+	}
+	return &fi, nil
+}
+
+func readDir(name string) ([]FileInfo, error) {
 	f, err := ioutil.ReadDir(name)
 	if err != nil {
 		return nil, err
 	}
 
-	files := make([]fileInfo, len(f))
+	files := make([]FileInfo, len(f))
 	for i := 0; i < len(f); i++ {
-		fi := f[i]
-		files[i] = fileInfo{
-			aTime: atime.Get(fi),
-			isDir: fi.IsDir(),
-			mode:  fi.Mode(),
-			mTime: fi.ModTime(),
-			name:  fi.Name(),
-			size:  fi.Size(),
+		files[i] = &fileInfo{
+			FileInfo: f[i],
 		}
 	}
 	return files, nil
