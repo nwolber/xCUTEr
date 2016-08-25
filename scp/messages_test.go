@@ -25,7 +25,7 @@ func TestProcessDMessageHappyPath(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r .", nil, &output)
+	s, _ := scp("scp -t -r .", nil, &output, false)
 	s.mkdir = func(name string, perm os.FileMode) error {
 		recordedName = name
 		recordedPerm = perm
@@ -63,7 +63,7 @@ func TestProcessDMessageHappyPath2(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r test", nil, &output)
+	s, _ := scp("scp -t -r test", nil, &output, false)
 	s.openFile = nil
 	s.mkdir = func(name string, perm os.FileMode) error {
 		recordedName = name
@@ -92,7 +92,7 @@ func TestProcessDMessageHappyPath2(t *testing.T) {
 
 func TestProcessDMessageInvalidLength(t *testing.T) {
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r .", nil, &output)
+	s, _ := scp("scp -t -r .", nil, &output, false)
 	msg := scpDMessage{
 		mode:   os.FileMode(0222),
 		length: 42,
@@ -109,7 +109,7 @@ func TestProcessEMessageHappyPath(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
+	s, _ := scp("scp -t -r "+name, nil, &output, false)
 	s.dir, _ = filepath.Abs("test/mydir")
 	s.openFile = nil
 	s.mkdir = nil
@@ -131,7 +131,7 @@ func TestProcessEMessageHappyPath2(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
+	s, _ := scp("scp -t -r "+name, nil, &output, false)
 	s.dir, _ = filepath.Abs("test")
 	s.openFile = nil
 	s.mkdir = nil
@@ -153,7 +153,7 @@ func TestProcessEMessageHappyPath3(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	s, _ := scp("scp -t -r "+name, nil, &output)
+	s, _ := scp("scp -t -r "+name, nil, &output, false)
 	s.dir, _ = filepath.Abs(".")
 	s.openFile = nil
 	s.mkdir = nil

@@ -63,8 +63,8 @@ func TestTransfer(t *testing.T) {
 		t.Logf("%q", tt.msg)
 		in := bytes.NewBufferString(tt.msg)
 
-		s, _ := scp(tt.cmd, in, &out)
-		s.openFile = func(name string, flags int, mode os.FileMode) (readWriteCloser, error) {
+		s, _ := scp(tt.cmd, in, &out, false)
+		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 			path, err := filepath.Abs(fileName)
 			if err != nil {
 				t.Fatal(err)
@@ -99,8 +99,8 @@ func TestTransferError(t *testing.T) {
 	t.Logf("%q", input)
 	in := bytes.NewBufferString(input)
 
-	s, _ := scp("scp -t .", in, &out)
-	s.openFile = func(name string, flags int, mode os.FileMode) (readWriteCloser, error) {
+	s, _ := scp("scp -t .", in, &out, false)
+	s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 		return nil, errorMessage
 	}
 	s.mkdir = nil
@@ -178,7 +178,7 @@ func TestTransferRecursive(t *testing.T) {
 		in := bytes.NewBufferString(tt.msg)
 
 		var out, file bytes.Buffer
-		s, _ := scp(tt.cmd, in, &out)
+		s, _ := scp(tt.cmd, in, &out, false)
 		files := []struct {
 			name string
 			mode os.FileMode
@@ -187,7 +187,7 @@ func TestTransferRecursive(t *testing.T) {
 			{"../test/myDir/nestedDir/" + file2.name, file2.mode},
 		}
 		i := 0
-		s.openFile = func(name string, flags int, mode os.FileMode) (readWriteCloser, error) {
+		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 			path, err := filepath.Abs(files[i].name)
 			if err != nil {
 				t.Fatal(err)

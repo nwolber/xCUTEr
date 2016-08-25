@@ -257,7 +257,7 @@ func parseSCPMessage(input []byte) (scpMessage, error) {
 		if item.itemType == b.typ {
 			b.bind(item.val)
 		} else {
-			return nil, fmt.Errorf("parser: expected: %q, found: %q at %d", b.typ, item.itemType, item.pos)
+			return nil, fmt.Errorf("parser: expected: %q, found: %q at %d of %q: %s", b.typ, item.itemType, item.pos, string(input), item.val)
 		}
 	}
 	return m, nil

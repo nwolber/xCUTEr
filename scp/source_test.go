@@ -32,6 +32,49 @@ func (*nopWriteCloser) Close() error {
 	return nil
 }
 
+type directory struct {
+	pathName string
+	info     FileInfo
+	files    []directory
+	contents string
+}
+
+type file struct {
+	name         string
+	aTime, mTime time.Time
+	isDir        bool
+	mode         os.FileMode
+	size         int64
+}
+
+func (f *file) Name() string {
+	return f.name
+}
+
+func (f *file) AccessTime() time.Time {
+	return f.aTime
+}
+
+func (f *file) ModTime() time.Time {
+	return f.mTime
+}
+
+func (f *file) IsDir() bool {
+	return f.isDir
+}
+
+func (f *file) Mode() os.FileMode {
+	return f.mode
+}
+
+func (f *file) Size() int64 {
+	return f.size
+}
+
+func (f *file) Sys() interface{} {
+	panic("should never be called")
+}
+
 func TestSimpleTransfer(t *testing.T) {
 	const (
 		fileMode     = os.FileMode(0664)
@@ -60,10 +103,10 @@ func TestSimpleTransfer(t *testing.T) {
 
 	for _, tt := range tests {
 		var out bytes.Buffer
-		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out)
+		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out, false)
 		expect(t, nil, err)
 
-		s.openFile = func(name string, flags int, mode os.FileMode) (readWriteCloser, error) {
+		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 			path, err := filepath.Abs(fileName)
 			if err != nil {
 				t.Fatal(err)
@@ -74,14 +117,14 @@ func TestSimpleTransfer(t *testing.T) {
 				bytes.NewBufferString(fileContents),
 			}, nil
 		}
-		s.stat = func(name string) (fileInfo, error) {
-			var fi fileInfo
-			fi.name = fileName
-			fi.mode = fileMode
-			fi.size = int64(len(fileContents))
-			fi.aTime = aTime
-			fi.mTime = mTime
-			return fi, nil
+		s.stat = func(name string) (FileInfo, error) {
+			var f file
+			f.name = fileName
+			f.mode = fileMode
+			f.size = int64(len(fileContents))
+			f.aTime = aTime
+			f.mTime = mTime
+			return &f, nil
 		}
 		s.readDir = nil
 		s.chtimes = nil
@@ -90,13 +133,6 @@ func TestSimpleTransfer(t *testing.T) {
 		expect(t, nil, err)
 		expect(t, tt.out, out.String())
 	}
-}
-
-type dir struct {
-	pathName string
-	info     fileInfo
-	files    []dir
-	contents string
 }
 
 func TestRecursiveTransfer(t *testing.T) {
@@ -111,19 +147,19 @@ func TestRecursiveTransfer(t *testing.T) {
 		mTime = time.Date(2011, 6, 2, 0, 0, 0, 0, time.FixedZone("CEST", 2*3600))
 	)
 
-	dir := dir{
+	dir := directory{
 		pathName: fileName,
-		info: fileInfo{
+		info: &file{
 			name:  fileName,
 			aTime: aTime,
 			mTime: mTime,
 			isDir: true,
 			mode:  os.FileMode(0755) | os.ModeDir,
 		},
-		files: []dir{
+		files: []directory{
 			{
 				pathName: fileName + "/file1.txt",
-				info: fileInfo{
+				info: &file{
 					name:  "file1.txt",
 					aTime: aTime,
 					mTime: mTime,
@@ -134,17 +170,17 @@ func TestRecursiveTransfer(t *testing.T) {
 			},
 			{
 				pathName: fileName + "/nestedDir",
-				info: fileInfo{
+				info: &file{
 					name:  "nestedDir",
 					aTime: aTime,
 					mTime: mTime,
 					isDir: true,
 					mode:  os.FileMode(0555) | os.ModeDir,
 				},
-				files: []dir{
+				files: []directory{
 					{
 						pathName: fileName + "/nestedDir/file2.txt",
-						info: fileInfo{
+						info: &file{
 							name:  "file2.txt",
 							aTime: aTime,
 							mTime: mTime,
@@ -164,11 +200,11 @@ func TestRecursiveTransfer(t *testing.T) {
 		{
 			cmd: fmt.Sprintf("scp -f -r %s", fileName),
 			in:  strings.Repeat("\x00", 9),
-			out: fmt.Sprintf("D%04o %d %s\n", dir.info.mode&os.ModePerm, dir.info.size, dir.info.name) +
-				fmt.Sprintf("C%04o %d %s\n", dir.files[0].info.mode, dir.files[0].info.size, dir.files[0].info.name) +
+			out: fmt.Sprintf("D%04o %d %s\n", dir.info.Mode()&os.ModePerm, dir.info.Size(), dir.info.Name()) +
+				fmt.Sprintf("C%04o %d %s\n", dir.files[0].info.Mode(), dir.files[0].info.Size(), dir.files[0].info.Name()) +
 				firstFileContents + "\x00" +
-				fmt.Sprintf("D%04o %d %s\n", dir.files[1].info.mode&os.ModePerm, dir.files[1].info.size, dir.files[1].info.name) +
-				fmt.Sprintf("C%04o %d %s\n", dir.files[1].files[0].info.mode, dir.files[1].files[0].info.size, dir.files[1].files[0].info.name) +
+				fmt.Sprintf("D%04o %d %s\n", dir.files[1].info.Mode()&os.ModePerm, dir.files[1].info.Size(), dir.files[1].info.Name()) +
+				fmt.Sprintf("C%04o %d %s\n", dir.files[1].files[0].info.Mode(), dir.files[1].files[0].info.Size(), dir.files[1].files[0].info.Name()) +
 				secondFileContents + "\x00" +
 				"E\nE\n",
 		},
@@ -176,14 +212,14 @@ func TestRecursiveTransfer(t *testing.T) {
 			cmd: fmt.Sprintf("scp -f -p -r %s", fileName),
 			in:  strings.Repeat("\x00", 13),
 			out: fmt.Sprintf("T%d 0 %d 0\n", mTime.Unix(), aTime.Unix()) +
-				fmt.Sprintf("D%04o %d %s\n", dir.info.mode&os.ModePerm, dir.info.size, dir.info.name) +
+				fmt.Sprintf("D%04o %d %s\n", dir.info.Mode()&os.ModePerm, dir.info.Size(), dir.info.Name()) +
 				fmt.Sprintf("T%d 0 %d 0\n", mTime.Unix(), aTime.Unix()) +
-				fmt.Sprintf("C%04o %d %s\n", dir.files[0].info.mode, dir.files[0].info.size, dir.files[0].info.name) +
+				fmt.Sprintf("C%04o %d %s\n", dir.files[0].info.Mode(), dir.files[0].info.Size(), dir.files[0].info.Name()) +
 				firstFileContents + "\x00" +
 				fmt.Sprintf("T%d 0 %d 0\n", mTime.Unix(), aTime.Unix()) +
-				fmt.Sprintf("D%04o %d %s\n", dir.files[1].info.mode&os.ModePerm, dir.files[1].info.size, dir.files[1].info.name) +
+				fmt.Sprintf("D%04o %d %s\n", dir.files[1].info.Mode()&os.ModePerm, dir.files[1].info.Size(), dir.files[1].info.Name()) +
 				fmt.Sprintf("T%d 0 %d 0\n", mTime.Unix(), aTime.Unix()) +
-				fmt.Sprintf("C%04o %d %s\n", dir.files[1].files[0].info.mode, dir.files[1].files[0].info.size, dir.files[1].files[0].info.name) +
+				fmt.Sprintf("C%04o %d %s\n", dir.files[1].files[0].info.Mode(), dir.files[1].files[0].info.Size(), dir.files[1].files[0].info.Name()) +
 				secondFileContents + "\x00" +
 				"E\nE\n",
 		},
@@ -191,10 +227,10 @@ func TestRecursiveTransfer(t *testing.T) {
 
 	for _, tt := range tests {
 		var out bytes.Buffer
-		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out)
+		s, err := scp(tt.cmd, bytes.NewBufferString(tt.in), &out, false)
 		expect(t, nil, err)
 
-		s.openFile = func(name string, flags int, mode os.FileMode) (readWriteCloser, error) {
+		s.openFile = func(name string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
 			var contents string
 			if strings.HasSuffix(name, dir.files[0].pathName) {
 				contents = dir.files[0].contents
@@ -209,7 +245,7 @@ func TestRecursiveTransfer(t *testing.T) {
 				bytes.NewBufferString(contents),
 			}, nil
 		}
-		s.stat = func(name string) (fileInfo, error) {
+		s.stat = func(name string) (FileInfo, error) {
 			if strings.HasSuffix(name, dir.pathName) {
 				return dir.info, nil
 			} else if strings.HasSuffix(name, dir.files[0].pathName) {
@@ -221,16 +257,16 @@ func TestRecursiveTransfer(t *testing.T) {
 			}
 
 			t.Log("stat:", name)
-			return fileInfo{}, errors.New("test stat error")
+			return &fileInfo{}, errors.New("test stat error")
 		}
-		s.readDir = func(name string) ([]fileInfo, error) {
+		s.readDir = func(name string) ([]FileInfo, error) {
 			if strings.HasSuffix(name, dir.pathName) {
-				return []fileInfo{
+				return []FileInfo{
 					dir.files[0].info,
 					dir.files[1].info,
 				}, nil
 			} else if strings.HasSuffix(name, dir.files[1].pathName) {
-				return []fileInfo{
+				return []FileInfo{
 					dir.files[1].files[0].info,
 				}, nil
 			}

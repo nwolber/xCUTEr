@@ -91,13 +91,13 @@ const (
 	itemError
 )
 
-type item struct {
+type lexItem struct {
 	itemType
 	val string
 	pos int
 }
 
-func (i item) String() string {
+func (i lexItem) String() string {
 	if i.itemType == itemEnd {
 		return "End"
 	} else if i.itemType == itemError {
@@ -109,7 +109,7 @@ func (i item) String() string {
 
 type lexer struct {
 	in    *lexReader
-	items chan item
+	items chan lexItem
 }
 
 func (l *lexer) error(err error) {
@@ -117,7 +117,7 @@ func (l *lexer) error(err error) {
 		return
 	}
 
-	l.items <- item{
+	l.items <- lexItem{
 		itemType: itemError,
 		val:      fmt.Sprintf("lex: %s", err),
 		pos:      l.in.pos,
@@ -125,19 +125,19 @@ func (l *lexer) error(err error) {
 }
 
 func (l *lexer) emit(t itemType) {
-	l.items <- item{
+	l.items <- lexItem{
 		itemType: t,
 		val:      string(l.in.getData()),
 		pos:      l.in.pos,
 	}
 }
 
-func lex(b []byte) (*lexer, chan item) {
+func lex(b []byte) (*lexer, chan lexItem) {
 	l := &lexer{
 		in: &lexReader{
 			data: b,
 		},
-		items: make(chan item),
+		items: make(chan lexItem),
 	}
 	go l.run()
 	return l, l.items

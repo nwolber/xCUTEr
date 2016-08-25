@@ -89,7 +89,8 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			return nil, err
 		}
 
-		file, err := tt.Interpolate(file)
+		var err error
+		file, err = tt.Interpolate(file)
 		if err != nil {
 			log.Println("error parsing template string", file, err)
 			return nil, err
@@ -156,6 +157,8 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 			return nil, err
 		}
 
+		// it's ok to "leak" the cancel, because cancelation happens
+		// automatically when the job ends
 		ctx, _ = context.WithTimeout(ctx, timeout)
 		l.Println("set timeout to", timeout)
 		return ctx, nil

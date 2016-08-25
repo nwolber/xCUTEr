@@ -18,6 +18,12 @@ type Flunc func(context.Context) (context.Context, error)
 func Sequential(children ...Flunc) Flunc {
 	return func(ctx context.Context) (context.Context, error) {
 		for _, child := range children {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
+
 			if child == nil {
 				continue
 			}
@@ -48,6 +54,12 @@ func Sequential(children ...Flunc) Flunc {
 // read first. Later errors will be lost.
 func Parallel(children ...Flunc) Flunc {
 	return func(ctx context.Context) (context.Context, error) {
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		default:
+		}
+
 		numChildren := len(children)
 		done := make(chan error)
 
@@ -65,14 +77,17 @@ func Parallel(children ...Flunc) Flunc {
 			}(childCtx, child, done)
 		}
 
-		var err error
 		for i := 0; i < numChildren; i++ {
-			err = <-done
-			if err != nil {
-				break
+			select {
+			case err := <-done:
+				if err != nil {
+					return nil, err
+				}
+			case <-ctx.Done():
+				return nil, ctx.Err()
 			}
 		}
 
-		return nil, err
+		return nil, nil
 	}
 }
