@@ -157,8 +157,9 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 			return nil, err
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
+		// it's ok to "leak" the cancel, because cancelation happens
+		// automatically when the job ends
+		ctx, _ = context.WithTimeout(ctx, timeout)
 		l.Println("set timeout to", timeout)
 		return ctx, nil
 	})
