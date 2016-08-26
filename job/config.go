@@ -26,6 +26,7 @@ type Config struct {
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
 	Command    *command    `json:"command,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
+	Tunnel     *forwarding `json:"tunnel,omitempty"`
 	SCP        *scpData    `json:"scp,omitempty"`
 }
 

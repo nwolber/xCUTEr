@@ -269,6 +269,10 @@ func (*stringVisitor) Forwarding(f *forwarding) interface{} {
 	return simple(fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort))
 }
 
+func (*stringVisitor) Tunnel(f *forwarding) interface{} {
+	return simple(fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort))
+}
+
 func (s *stringVisitor) Commands(cmd *command) group {
 	return &multiple{
 		typ: "Command",

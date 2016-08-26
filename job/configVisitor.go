@@ -40,6 +40,7 @@ type configVisitor interface {
 	Templating(c *Config, h *host) interface{}
 	SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{}
 	Forwarding(f *forwarding) interface{}
+	Tunnel(f *forwarding) interface{}
 	Commands(cmd *command) group
 	Command(cmd *command) interface{}
 	LocalCommand(cmd *command) interface{}
@@ -128,6 +129,10 @@ func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
 
 	if f := c.Forwarding; f != nil {
 		children.Append(builder.Forwarding(f))
+	}
+
+	if t := c.Tunnel; t != nil {
+		children.Append(builder.Tunnel(t))
 	}
 
 	return children, nil

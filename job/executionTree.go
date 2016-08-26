@@ -313,7 +313,30 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
 		localAddr := fmt.Sprintf("%s:%d", f.LocalHost, f.LocalPort)
 		l.Println("setting up forwarding", remoteAddr, "->", localAddr)
-		s.forward(ctx, remoteAddr, localAddr)
+		s.forwardRemote(ctx, remoteAddr, localAddr)
+
+		return nil, nil
+	})
+}
+
+func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		if !ok {
+			return nil, fmt.Errorf("no %s available", sshClientKey)
+		}
+
+		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
+		localAddr := fmt.Sprintf("%s:%d", f.LocalHost, f.LocalPort)
+		l.Println("setting up tunnel", remoteAddr, "->", localAddr)
+		s.forwardTunnel(ctx, remoteAddr, localAddr)
 
 		return nil, nil
 	})

@@ -15,12 +15,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// forward instructs the connect SSH server to forward all connections attempts
+// forwardRemote instructs the connect SSH server to forward all connections attempts
 // on remoteAddr to the local client. The client will then establish a connection
 // to localAddr and forward any payload exchanged.
 //
 // Allocated resources will be released, when the context completes.
-func forward(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
+func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
 	l, ok := ctx.Value(loggerKey).(*log.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
@@ -28,9 +28,40 @@ func forward(ctx context.Context, client *ssh.Client, remoteAddr string, localAd
 
 	listener, err := client.Listen("tcp", remoteAddr)
 	if err != nil {
-		err = fmt.Errorf("Unable to listen to %s on remote host %s: %s", remoteAddr, client.RemoteAddr(), err)
+		err = fmt.Errorf("unable to listen to %s on remote host %s: %s", remoteAddr, client.RemoteAddr(), err)
 		l.Println(err)
 		return
+	}
+
+	runTunnel(ctx, listener, net.Dial, localAddr)
+}
+
+// forwardLocal forwards all connection attempts on localAddr to the remote host client
+// connects to. The remote host will then establish a connection remoteAddr.
+//
+// Allocated resources will be released, when the context completes.
+func forwardLocal(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
+	listener, err := net.Listen("tcp", localAddr)
+	if err != nil {
+		err = fmt.Errorf("unable to listen to %s: %s", localAddr, err)
+		l.Println(err)
+		return
+	}
+
+	runTunnel(ctx, listener, client.Dial, remoteAddr)
+}
+
+type dial func(network, address string) (net.Conn, error)
+
+func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) {
+	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	go func() {
@@ -45,20 +76,20 @@ func forward(ctx context.Context, client *ssh.Client, remoteAddr string, localAd
 				}
 
 				if remoteConn.error != nil {
-					l.Println("error accepting connection", err)
+					l.Println("error accepting tunnel connection", remoteConn.error)
 					return
 				}
 
 				go func(conn net.Conn) {
 					defer conn.Close()
-					l.Println("accepted connection from remote tunnel")
+					l.Println("accepted tunnel connection")
 
-					localConn, err := net.Dial("tcp", localAddr)
+					localConn, err := d("tcp", addr)
 					if err != nil {
-						l.Println("unable to connect to local endpoint", localAddr, err)
+						l.Println("unable to connect to endpoint", addr, err)
 						return
 					}
-					l.Println("connected to local endpoint")
+					l.Println("connected to endpoint")
 
 					go copyConn(localConn, conn)
 					copyConn(conn, localConn)

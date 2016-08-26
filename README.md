@@ -229,14 +229,23 @@ The syntax can be found [here](https://godoc.org/regexp/syntax).
 * matchString: If present used instead of the hosts `Name`field for pattern matching against `pattern`.
 Supports templating with any field from the host, including tags.
 
-##### Forwarding
+##### Forwarding and Tunneling
 Forwarding instructs the host to open a tunnel from the host to the machine xCUTEr is running on.
+The same is possible for the opposite direction, where local connection attempts are tunneled to the remote host
 ```json
 "forwarding": {
     "remoteHost": "0.0.0.0",
     "remotePort": 1337,
     "localHost": "google.de",
     "localPort": "443"
+}
+```
+```json
+"tunnel": {
+    "remoteHost": "10.23.67.234",
+    "remotePort": 443,
+    "localHost": "127.0.0.1",
+    "localPort": "8080"
 }
 ```
 * remoteHost: Interface to listen on the host.

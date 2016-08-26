@@ -230,6 +230,10 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 	return nil
 }
 
-func (s *sshClient) forward(ctx context.Context, remoteAddr, localAddr string) {
-	forward(ctx, s.c, remoteAddr, localAddr)
+func (s *sshClient) forwardRemote(ctx context.Context, remoteAddr, localAddr string) {
+	forwardRemote(ctx, s.c, remoteAddr, localAddr)
+}
+
+func (s *sshClient) forwardTunnel(ctx context.Context, remoteAddr, localAddr string) {
+	forwardLocal(ctx, s.c, remoteAddr, localAddr)
 }
