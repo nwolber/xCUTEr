@@ -7,7 +7,6 @@ package scp
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -236,7 +235,7 @@ func lexSpace(l *lexer) []state {
 }
 
 func isPathCharacter(r rune) bool {
-	return unicode.IsLetter(r) || unicode.IsNumber(r) || r == os.PathSeparator || r == '.'
+	return r != '\n'
 }
 
 func name() state {
