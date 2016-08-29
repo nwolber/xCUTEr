@@ -33,7 +33,7 @@ func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, l
 		return
 	}
 
-	runTunnel(ctx, listener, net.Dial, localAddr)
+	go runTunnel(ctx, listener, net.Dial, localAddr)
 }
 
 // forwardLocal forwards all connection attempts on localAddr to the remote host client
@@ -53,7 +53,7 @@ func forwardLocal(ctx context.Context, client *ssh.Client, remoteAddr string, lo
 		return
 	}
 
-	runTunnel(ctx, listener, client.Dial, remoteAddr)
+	go runTunnel(ctx, listener, client.Dial, remoteAddr)
 }
 
 type dial func(network, address string) (net.Conn, error)
@@ -64,44 +64,42 @@ func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) 
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	go func() {
-		acceptChan := accept(ctx, listener)
+	acceptChan := accept(ctx, listener)
 
-		for {
-			select {
-			case remoteConn, ok := <-acceptChan:
-				if !ok {
-					l.Println("accept channel closed")
-					return
-				}
-
-				if remoteConn.error != nil {
-					l.Println("error accepting tunnel connection", remoteConn.error)
-					return
-				}
-
-				go func(conn net.Conn) {
-					defer conn.Close()
-					l.Println("accepted tunnel connection")
-
-					localConn, err := d("tcp", addr)
-					if err != nil {
-						l.Println("unable to connect to endpoint", addr, err)
-						return
-					}
-					l.Println("connected to endpoint")
-
-					go copyConn(localConn, conn)
-					copyConn(conn, localConn)
-					l.Println("tunnel connection closed")
-				}(remoteConn)
-
-			case <-ctx.Done():
-				l.Println("closing tunnel")
+	for {
+		select {
+		case remoteConn, ok := <-acceptChan:
+			if !ok {
+				l.Println("accept channel closed")
 				return
 			}
+
+			if remoteConn.error != nil {
+				l.Println("error accepting tunnel connection", remoteConn.error)
+				return
+			}
+
+			go func(conn net.Conn) {
+				defer conn.Close()
+				l.Println("accepted tunnel connection")
+
+				localConn, err := d("tcp", addr)
+				if err != nil {
+					l.Println("unable to connect to endpoint", addr, err)
+					return
+				}
+				l.Println("connected to endpoint")
+
+				go copyConn(localConn, conn)
+				copyConn(conn, localConn)
+				l.Println("tunnel connection closed")
+			}(remoteConn)
+
+		case <-ctx.Done():
+			l.Println("closing tunnel")
+			return
 		}
-	}()
+	}
 }
 
 func copyConn(writer io.Writer, reader io.Reader) {
