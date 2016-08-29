@@ -6,6 +6,7 @@ package xCUTEr
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync/atomic"
@@ -26,7 +27,7 @@ type XCUTEr struct {
 }
 
 // New creates a new xCUTEr with the given config options.
-func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *XCUTEr {
+func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) (*XCUTEr, error) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
 	if logFile != "" {
@@ -48,9 +49,9 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 	if file != "" {
 		j, err := parse(file)
 		if err != nil {
-			log.Println("error parsing", file, err)
+			err = fmt.Errorf("error parsing %s: %s", file, err)
 			mainCancel()
-			return nil
+			return nil, err
 		}
 		go func() {
 			e.Run(j, once)
@@ -73,6 +74,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 						j, err := parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
+							continue
 						}
 						e.Add(j)
 					} else if event.Op&fsnotify.Remove == fsnotify.Remove {
@@ -85,6 +87,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 						j, err := parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
+							continue
 						}
 						e.Add(j)
 					}
@@ -104,5 +107,5 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 		Completed:       e.GetCompleted,
 		MaxCompleted:    func() uint32 { return e.maxCompleted },
 		SetMaxCompleted: func(max uint32) { atomic.StoreUint32(&e.maxCompleted, max) },
-	}
+	}, nil
 }

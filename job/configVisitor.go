@@ -58,7 +58,7 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 		return nil, errors.New("either 'host' or 'hostsFile' must be present")
 	}
 
-	if c.Host != nil && c.HostsFile == nil {
+	if c.Host != nil && c.HostsFile != nil {
 		return nil, errors.New("either 'host' or 'hostsFile' may be present")
 	}
 

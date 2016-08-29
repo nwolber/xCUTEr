@@ -24,7 +24,10 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
 
-	x := xCUTEr.New(config())
+	x, err := xCUTEr.New(config())
+	if err != nil {
+		log.Fatalln(err)
+	}
 	x.Start()
 
 	select {
