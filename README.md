@@ -113,6 +113,9 @@ This Job does the same as the one above, but the hosts file can be reused in mul
         "port": 34567,
         "key": "id_rsa"
     },
+    "pre": {
+        "command": "echo \"starting execution\""
+    },
     "command": {
         "flow": "sequential",
         "commands": [
@@ -145,6 +148,9 @@ This Job does the same as the one above, but the hosts file can be reused in mul
                 "command": "rm {{.Host.Addr}}_stdout.txt {{.Host.Addr}}_stderr.txt index.html uname.txt"
             }
         ]
+    },
+    "post": {
+        "command": "echo \"execution successful\""
     }
 }
 ```
@@ -307,6 +313,10 @@ Supports *[templating](#templating)*.
 Inherited output files can be overriden by subcommands.
 May be the same as `stdout`.
 Supports *[templating](#templating)*.
+
+##### Pre & Post
+Pre and Post have the same syntax as a normal command.
+Because they are executed before or after *normal* commands, they are always executed locally.
 
 #### Templating
 

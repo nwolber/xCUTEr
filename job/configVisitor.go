@@ -79,6 +79,14 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 		children.Append(builder.SCP(c.SCP))
 	}
 
+	if c.Pre != nil {
+		pre, err := visitCommand(builder, localCommand(c.Pre))
+		if err != nil {
+			return nil, err
+		}
+		children.Append(pre)
+	}
+
 	cmd, err := visitCommand(builder, c.Command)
 	if err != nil {
 		return nil, err
@@ -113,7 +121,36 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 		children.Append(hostFluncs.Wrap())
 	}
 
+	if c.Post != nil {
+		post, err := visitCommand(builder, localCommand(c.Post))
+		if err != nil {
+			return nil, err
+		}
+		children.Append(post)
+	}
+
 	return children.Wrap(), nil
+}
+
+// localCommand turns any command in a command that is only executed locally
+func localCommand(c *command) *command {
+	lc := &command{
+		Name:    c.Name,
+		Command: c.Command,
+		Flow:    c.Flow,
+		Target:  "local",
+		Retries: c.Retries,
+		Stdout:  c.Stdout,
+		Stderr:  c.Stderr,
+	}
+
+	if len(c.Commands) > 0 {
+		for _, cc := range c.Commands {
+			lc.Commands = append(lc.Commands, localCommand(cc))
+		}
+	}
+
+	return lc
 }
 
 func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
