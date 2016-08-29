@@ -75,10 +75,11 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
+		if output != nil {
+			return ctx, nil
+		}
+
 		if file == "" {
-			if output != nil {
-				return context.WithValue(ctx, outputKey, output), nil
-			}
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
 
@@ -142,7 +143,12 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 			return nil, err
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, h.Name), log.Flags())
+		name := h.Name
+		if name == "" {
+			name = fmt.Sprintf("%s@%s:%d", h.User, h.Addr, h.Port)
+		}
+
+		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, name), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	})

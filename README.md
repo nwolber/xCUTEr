@@ -18,6 +18,7 @@ Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS 
 * `-file` Job file to execute.
 Takes presedence over `-jobs`.
 * `-once` Run the job given by `-file` only once, regardless of the [schedule](#schedule) directive.
+* `-quiet` Disable any log output from xCUTEr. Output from commands or SCP in verbose mode is still printed.
 * `-log` Log file.
 
 ## Job definition

@@ -11,19 +11,21 @@ import (
 	"time"
 )
 
-func config() (jobDir string, sshTTL time.Duration, file, logFile string, once bool) {
+func config() (jobDir string, sshTTL time.Duration, file, logFile string, once, quiet bool) {
 	const (
 		jobDirDefault  = "."
 		sshTTLDefault  = time.Minute * 10
 		logFileDefault = ""
 		fileDefault    = ""
 		onceDefault    = false
+		quietDefault   = false
 	)
 
 	flag.StringVar(&jobDir, "jobs", jobDirDefault, "Directory to watch for .job files")
 	flag.DurationVar(&sshTTL, "sshTTL", sshTTLDefault, "Time until an unused SSH connection is closed")
 	flag.StringVar(&file, "file", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
+	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turining off log messages. Command output is still printed. Overwrites -log.")
 	flag.StringVar(&logFile, "log", logFileDefault, "Log file")
 
 	help := flag.Bool("help", false, "Display this help")
@@ -39,6 +41,10 @@ func config() (jobDir string, sshTTL time.Duration, file, logFile string, once b
 	if *config {
 		fmt.Println("jobs  :", jobDir)
 		fmt.Println("sshTTL:", sshTTL)
+		fmt.Println("file  :", file)
+		fmt.Println("once  :", once)
+		fmt.Println("quiet :", quiet)
+		fmt.Println("log   :", logFile)
 		os.Exit(0)
 	}
 

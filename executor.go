@@ -7,6 +7,7 @@ package xCUTEr
 import (
 	"bytes"
 	"context"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -61,7 +62,13 @@ func (info *runInfo) Output() string {
 
 func (info *runInfo) run() {
 	ctx, cancel := context.WithCancel(info.e.mainCtx)
-	ctx = context.WithValue(ctx, "output", info.output)
+
+	output, ok := ctx.Value(outputKey).(io.Writer)
+	if ok {
+		ctx = context.WithValue(ctx, outputKey, io.MultiWriter(output, &info.output))
+	} else {
+		// ctx = context.WithValue(ctx, "output", &info.output)
+	}
 
 	info.cancel = cancel
 

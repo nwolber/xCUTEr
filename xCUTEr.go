@@ -7,6 +7,7 @@ package xCUTEr
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"sync/atomic"
@@ -26,11 +27,15 @@ type XCUTEr struct {
 	SetMaxCompleted     func(uint32)
 }
 
+const (
+	outputKey = "output"
+)
+
 // New creates a new xCUTEr with the given config options.
-func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) (*XCUTEr, error) {
+func New(jobDir string, sshTTL time.Duration, file, logFile string, once, quiet bool) (*XCUTEr, error) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
-	if logFile != "" {
+	if logFile != "" && !quiet {
 		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatalln(err)
@@ -40,9 +45,15 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) (
 		os.Stderr = f
 	}
 
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+
+	if quiet {
+		log.SetOutput(ioutil.Discard)
+		mainCtx = context.WithValue(mainCtx, outputKey, ioutil.Discard)
+	}
+
 	job.InitializeSSHClientStore(sshTTL)
 
-	mainCtx, mainCancel := context.WithCancel(context.Background())
 	e := newExecutor(mainCtx)
 	e.Start()
 
