@@ -24,8 +24,11 @@ type Config struct {
 	Output     string      `json:"output,omitempty"`
 	Host       *host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
+	Pre        *command    `json:"pre,omitempty"`
 	Command    *command    `json:"command,omitempty"`
+	Post       *command    `json:"post,omitempty"`
 	Forwarding *forwarding `json:"forwarding,omitempty"`
+	Tunnel     *forwarding `json:"tunnel,omitempty"`
 	SCP        *scpData    `json:"scp,omitempty"`
 }
 

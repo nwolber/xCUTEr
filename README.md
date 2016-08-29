@@ -18,6 +18,7 @@ Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS 
 * `-file` Job file to execute.
 Takes presedence over `-jobs`.
 * `-once` Run the job given by `-file` only once, regardless of the [schedule](#schedule) directive.
+* `-quiet` Disable any log output from xCUTEr. Output from commands or SCP in verbose mode is still printed.
 * `-log` Log file.
 
 ## Job definition
@@ -113,6 +114,9 @@ This Job does the same as the one above, but the hosts file can be reused in mul
         "port": 34567,
         "key": "id_rsa"
     },
+    "pre": {
+        "command": "echo \"starting execution\""
+    },
     "command": {
         "flow": "sequential",
         "commands": [
@@ -145,6 +149,9 @@ This Job does the same as the one above, but the hosts file can be reused in mul
                 "command": "rm {{.Host.Addr}}_stdout.txt {{.Host.Addr}}_stderr.txt index.html uname.txt"
             }
         ]
+    },
+    "post": {
+        "command": "echo \"execution successful\""
     }
 }
 ```
@@ -229,14 +236,23 @@ The syntax can be found [here](https://godoc.org/regexp/syntax).
 * matchString: If present used instead of the hosts `Name`field for pattern matching against `pattern`.
 Supports templating with any field from the host, including tags.
 
-##### Forwarding
+##### Forwarding and Tunneling
 Forwarding instructs the host to open a tunnel from the host to the machine xCUTEr is running on.
+The same is possible for the opposite direction, where local connection attempts are tunneled to the remote host
 ```json
 "forwarding": {
     "remoteHost": "0.0.0.0",
     "remotePort": 1337,
     "localHost": "google.de",
     "localPort": "443"
+}
+```
+```json
+"tunnel": {
+    "remoteHost": "10.23.67.234",
+    "remotePort": 443,
+    "localHost": "127.0.0.1",
+    "localPort": "8080"
 }
 ```
 * remoteHost: Interface to listen on the host.
@@ -293,11 +309,17 @@ Either empty for hosts or `local` to execute on the machine xCUTEr is running on
 * retries: How often to retry a failed command.
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
+The special value ```null``` discards any output written to STDOUT.
 Supports *[templating](#templating)*.
 * stderr: File where to redirect STDERR of the command and subcommands.
 Inherited output files can be overriden by subcommands.
+The special value ```null``` discards any output written to STDERR.
 May be the same as `stdout`.
 Supports *[templating](#templating)*.
+
+##### Pre & Post
+Pre and Post have the same syntax as a normal command.
+Because they are executed before or after *normal* commands, they are always executed locally.
 
 #### Templating
 

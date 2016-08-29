@@ -75,10 +75,11 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
+		if output != nil {
+			return ctx, nil
+		}
+
 		if file == "" {
-			if output != nil {
-				return context.WithValue(ctx, outputKey, io.MultiWriter(os.Stdout, output)), nil
-			}
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
 
@@ -142,7 +143,12 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 			return nil, err
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, h.Name), log.Flags())
+		name := h.Name
+		if name == "" {
+			name = fmt.Sprintf("%s@%s:%d", h.User, h.Addr, h.Port)
+		}
+
+		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, name), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, loggerKey, logger), nil
 	})
@@ -313,7 +319,30 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
 		localAddr := fmt.Sprintf("%s:%d", f.LocalHost, f.LocalPort)
 		l.Println("setting up forwarding", remoteAddr, "->", localAddr)
-		s.forward(ctx, remoteAddr, localAddr)
+		s.forwardRemote(ctx, remoteAddr, localAddr)
+
+		return nil, nil
+	})
+}
+
+func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
+	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		if !ok {
+			err := fmt.Errorf("no %s available", loggerKey)
+			log.Println(err)
+			return nil, err
+		}
+
+		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		if !ok {
+			return nil, fmt.Errorf("no %s available", sshClientKey)
+		}
+
+		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
+		localAddr := fmt.Sprintf("%s:%d", f.LocalHost, f.LocalPort)
+		l.Println("setting up tunnel", remoteAddr, "->", localAddr)
+		s.forwardTunnel(ctx, remoteAddr, localAddr)
 
 		return nil, nil
 	})
@@ -351,7 +380,15 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 		}
 
 		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		if stdout == nil {
+			stdout = os.Stdout
+		}
+
 		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		if stderr == nil {
+			stderr = os.Stderr
+		}
+
 		err = s.executeCommand(ctx, command, stdout, stderr)
 		return nil, err
 	})
@@ -388,7 +425,14 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 
 		cmd := exec.CommandContext(ctx, exe, args...)
 		cmd.Stdout = stdout
+		if cmd.Stdout == nil {
+			cmd.Stdout = os.Stdout
+		}
+
 		cmd.Stderr = stderr
+		if cmd.Stderr == nil {
+			cmd.Stderr = os.Stderr
+		}
 
 		l.Println("executing local command", command)
 		if err := cmd.Run(); err != nil {
@@ -402,6 +446,10 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 
 func (e *executionTreeVisitor) Stdout(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		if file == "null" {
+			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
+		}
+
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -446,6 +494,10 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 
 func (*executionTreeVisitor) Stderr(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		if file == "null" {
+			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
+		}
+
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)

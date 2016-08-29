@@ -6,6 +6,8 @@ package xCUTEr
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"sync/atomic"
@@ -25,11 +27,15 @@ type XCUTEr struct {
 	SetMaxCompleted     func(uint32)
 }
 
+const (
+	outputKey = "output"
+)
+
 // New creates a new xCUTEr with the given config options.
-func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *XCUTEr {
+func New(jobDir string, sshTTL time.Duration, file, logFile string, once, quiet bool) (*XCUTEr, error) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
-	if logFile != "" {
+	if logFile != "" && !quiet {
 		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatalln(err)
@@ -39,18 +45,24 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 		os.Stderr = f
 	}
 
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+
+	if quiet {
+		log.SetOutput(ioutil.Discard)
+		mainCtx = context.WithValue(mainCtx, outputKey, ioutil.Discard)
+	}
+
 	job.InitializeSSHClientStore(sshTTL)
 
-	mainCtx, mainCancel := context.WithCancel(context.Background())
 	e := newExecutor(mainCtx)
 	e.Start()
 
 	if file != "" {
 		j, err := parse(file)
 		if err != nil {
-			log.Println("error parsing", file, err)
+			err = fmt.Errorf("error parsing %s: %s", file, err)
 			mainCancel()
-			return nil
+			return nil, err
 		}
 		go func() {
 			e.Run(j, once)
@@ -73,6 +85,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 						j, err := parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
+							continue
 						}
 						e.Add(j)
 					} else if event.Op&fsnotify.Remove == fsnotify.Remove {
@@ -85,6 +98,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 						j, err := parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
+							continue
 						}
 						e.Add(j)
 					}
@@ -104,5 +118,5 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once bool) *
 		Completed:       e.GetCompleted,
 		MaxCompleted:    func() uint32 { return e.maxCompleted },
 		SetMaxCompleted: func(max uint32) { atomic.StoreUint32(&e.maxCompleted, max) },
-	}
+	}, nil
 }

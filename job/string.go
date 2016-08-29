@@ -269,6 +269,10 @@ func (*stringVisitor) Forwarding(f *forwarding) interface{} {
 	return simple(fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort))
 }
 
+func (*stringVisitor) Tunnel(f *forwarding) interface{} {
+	return simple(fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort))
+}
+
 func (s *stringVisitor) Commands(cmd *command) group {
 	return &multiple{
 		typ: "Command",
@@ -299,9 +303,17 @@ func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 }
 
 func (s *stringVisitor) Stdout(file string) interface{} {
+	if file == "null" {
+		return simple("Discard any output from STDOUT")
+	}
+
 	return simple("Redirect STDOUT to " + file)
 }
 
 func (s *stringVisitor) Stderr(file string) interface{} {
+	if file == "null" {
+		return simple("Discard any output from STDERR")
+	}
+
 	return simple("Redirect STDERR to " + file)
 }
