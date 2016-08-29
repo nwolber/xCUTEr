@@ -308,9 +308,11 @@ Either empty for hosts or `local` to execute on the machine xCUTEr is running on
 * retries: How often to retry a failed command.
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
+The special value ```null``` discards any output written to STDOUT.
 Supports *[templating](#templating)*.
 * stderr: File where to redirect STDERR of the command and subcommands.
 Inherited output files can be overriden by subcommands.
+The special value ```null``` discards any output written to STDERR.
 May be the same as `stdout`.
 Supports *[templating](#templating)*.
 

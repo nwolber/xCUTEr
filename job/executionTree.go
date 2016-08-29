@@ -77,7 +77,7 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 
 		if file == "" {
 			if output != nil {
-				return context.WithValue(ctx, outputKey, io.MultiWriter(os.Stdout, output)), nil
+				return context.WithValue(ctx, outputKey, output), nil
 			}
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
@@ -374,7 +374,15 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 		}
 
 		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		if stdout == nil {
+			stdout = os.Stdout
+		}
+
 		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		if stderr == nil {
+			stderr = os.Stderr
+		}
+
 		err = s.executeCommand(ctx, command, stdout, stderr)
 		return nil, err
 	})
@@ -411,7 +419,14 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 
 		cmd := exec.CommandContext(ctx, exe, args...)
 		cmd.Stdout = stdout
+		if cmd.Stdout == nil {
+			cmd.Stdout = os.Stdout
+		}
+
 		cmd.Stderr = stderr
+		if cmd.Stderr == nil {
+			cmd.Stderr = os.Stderr
+		}
 
 		l.Println("executing local command", command)
 		if err := cmd.Run(); err != nil {
@@ -425,6 +440,10 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 
 func (e *executionTreeVisitor) Stdout(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		if file == "null" {
+			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
+		}
+
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -469,6 +488,10 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 
 func (*executionTreeVisitor) Stderr(file string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+		if file == "null" {
+			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
+		}
+
 		l, ok := ctx.Value(loggerKey).(*log.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)

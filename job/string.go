@@ -303,9 +303,17 @@ func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 }
 
 func (s *stringVisitor) Stdout(file string) interface{} {
+	if file == "null" {
+		return simple("Discard any output from STDOUT")
+	}
+
 	return simple("Redirect STDOUT to " + file)
 }
 
 func (s *stringVisitor) Stderr(file string) interface{} {
+	if file == "null" {
+		return simple("Discard any output from STDERR")
+	}
+
 	return simple("Redirect STDERR to " + file)
 }
