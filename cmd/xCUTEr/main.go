@@ -17,14 +17,18 @@ import (
 )
 
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	jobDir, sshTTL, file, logFile, perf, once, quiet := config()
+
+	if perf != "" {
+		go func() {
+			log.Println(http.ListenAndServe(perf, nil))
+		}()
+	}
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
 
-	x, err := xCUTEr.New(config())
+	x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
 	if err != nil {
 		log.Fatalln(err)
 	}
