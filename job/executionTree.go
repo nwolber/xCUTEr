@@ -5,6 +5,7 @@
 package job
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -424,19 +425,23 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 		exe := parts[0]
 		args := parts[1:]
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
-
 		cmd := exec.CommandContext(ctx, exe, args...)
-		cmd.Stdout = stdout
-		if cmd.Stdout == nil {
-			cmd.Stdout = os.Stdout
-		}
 
-		cmd.Stderr = stderr
-		if cmd.Stderr == nil {
-			cmd.Stderr = os.Stderr
+		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		if stdout == nil {
+			stdout = os.Stdout
 		}
+		stdout = bufio.NewWriter(stdout)
+		defer stdout.(*bufio.Writer).Flush()
+		cmd.Stdout = stdout
+
+		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		if stderr == nil {
+			stderr = os.Stderr
+		}
+		stderr = bufio.NewWriter(stderr)
+		defer stderr.(*bufio.Writer).Flush()
+		cmd.Stderr = stderr
 
 		l.Println("executing local command", command)
 		if err := cmd.Run(); err != nil {
