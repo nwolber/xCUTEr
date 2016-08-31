@@ -103,7 +103,7 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 	}
 
 	if c.HostsFile != nil {
-		hosts, err := loadHostsFile(c.HostsFile)
+		hosts, err := readHostsFile(c.HostsFile)
 		if err != nil {
 			return nil, err
 		}
