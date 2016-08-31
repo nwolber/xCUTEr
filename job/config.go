@@ -5,14 +5,18 @@
 package job
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"regexp"
+	"strings"
 	"text/template"
 	"time"
+	"unicode"
 )
 
 // Config is the in-memory representation of a job configuration.
@@ -112,8 +116,6 @@ func (o *output) MarshalJSON() ([]byte, error) {
 }
 
 func (o *output) UnmarshalJSON(b []byte) error {
-	log.Println(string(b))
-
 	if err := json.Unmarshal(b, &o.File); err == nil {
 		return nil
 	}
@@ -170,18 +172,43 @@ type command struct {
 
 // ReadConfig parses the file into a Config.
 func ReadConfig(file string) (*Config, error) {
-	var c Config
-
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(b, &c); err != nil {
+	c, err := parseConfig(bytes.NewReader(b))
+	if err != nil {
 		return nil, err
 	}
 
-	return &c, nil
+	return c, nil
+}
+
+func parseConfig(r io.Reader) (*Config, error) {
+	s := bufio.NewScanner(r)
+	r, w := io.Pipe()
+	go func() {
+		for s.Scan() {
+			line := strings.TrimLeftFunc(s.Text(), unicode.IsSpace)
+			if strings.HasPrefix(line, "//") {
+				continue
+			}
+			fmt.Fprintf(w, line)
+		}
+
+		if err := s.Err(); err != nil {
+			w.CloseWithError(err)
+		} else {
+			w.Close()
+		}
+	}()
+
+	d := json.NewDecoder(r)
+
+	var c Config
+	err := d.Decode(&c)
+	return &c, err
 }
 
 func loadHostsFile(file *hostsFile) (*hostConfig, error) {

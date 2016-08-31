@@ -1,6 +1,7 @@
 package job
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -42,4 +43,13 @@ func TestUnmarshalOutput(t *testing.T) {
 		expect(t, nil, err)
 		expect(t, *test.want.Output, *c.Output)
 	}
+}
+
+func TestParseConfig(t *testing.T) {
+	input := `{
+        // comment
+    }`
+
+	_, err := parseConfig(bytes.NewReader([]byte(input)))
+	expect(t, nil, err)
 }
