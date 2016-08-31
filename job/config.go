@@ -7,6 +7,7 @@ package job
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"regexp"
@@ -14,14 +15,12 @@ import (
 	"time"
 )
 
-type hostConfig map[string]*host
-
 // Config is the in-memory representation of a job configuration.
 type Config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
 	Timeout    string      `json:"timeout,omitempty"`
-	Output     string      `json:"output,omitempty"`
+	Output     *output     `json:"output,omitempty"`
 	Host       *host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
 	Pre        *command    `json:"pre,omitempty"`
@@ -70,6 +69,8 @@ func (c *Config) JSON() string {
 	return string(b)
 }
 
+type hostConfig map[string]*host
+
 type hostsFile struct {
 	File        string `json:"file,omitempty"`
 	Pattern     string `json:"pattern,omitempty"`
@@ -85,6 +86,57 @@ type host struct {
 	Password            string            `json:"password,omitempty"`
 	KeyboardInteractive map[string]string `json:"keyboardInteractive,omitempty"`
 	Tags                map[string]string `json:"tags,omitempty"`
+}
+
+type output struct {
+	File      string `json:"file,omitempty"`
+	Raw       bool   `json:"raw,omitempty"`
+	Overwrite bool   `json:"overwrite,omitempty"`
+}
+
+func (o output) String() string {
+	return fmt.Sprintf("%s, Raw: %t, Overwrite: %t", o.File, o.Raw, o.Overwrite)
+}
+
+func (o *output) MarshalJSON() ([]byte, error) {
+	if !o.Raw && !o.Overwrite {
+		return []byte(o.File), nil
+	}
+
+	var obj map[string]interface{}
+	obj["file"] = o.File
+	obj["raw"] = o.Raw
+	obj["overwrite"] = o.Overwrite
+
+	return json.Marshal(obj)
+}
+
+func (o *output) UnmarshalJSON(b []byte) error {
+	log.Println(string(b))
+
+	if err := json.Unmarshal(b, &o.File); err == nil {
+		return nil
+	}
+
+	var obj map[string]interface{}
+	if err := json.Unmarshal(b, &obj); err != nil {
+		return err
+	}
+
+	for k, v := range obj {
+		switch k {
+		case "file":
+			o.File = v.(string)
+		case "raw":
+			o.Raw = v.(bool)
+		case "overwrite":
+			o.Overwrite = v.(bool)
+		default:
+			return fmt.Errorf("output has no property '%s'", k)
+		}
+	}
+
+	return nil
 }
 
 type forwarding struct {
@@ -108,8 +160,8 @@ type command struct {
 	Flow     string     `json:"flow,omitempty"`
 	Target   string     `json:"target,omitempty"`
 	Retries  uint       `json:"retries,omitempty"`
-	Stdout   string     `json:"stdout,omitempty"`
-	Stderr   string     `json:"stderr,omitempty"`
+	Stdout   *output    `json:"stdout,omitempty"`
+	Stderr   *output    `json:"stderr,omitempty"`
 }
 
 // func (c *command) String() string {

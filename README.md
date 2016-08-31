@@ -186,6 +186,19 @@ Supports *[templating](#templating)*.
 ```json
 "output": "logfile"
 ```
+or in the extended form:
+
+```json
+"output": {
+    "file": "logfile",
+    "raw": true,
+    "overwrite": false,
+}
+```
+* file: File where to redirect STDOUT and STDERR of the job.
+Supports *[templating](#templating)*.
+* raw: Suppress banner before output. Default: `false`.
+* overwrite: Overwrite existing file content. Default `false`.
 
 ##### Host
 The host where to execute the commands in the job.
@@ -310,11 +323,13 @@ Either empty for hosts or `local` to execute on the machine xCUTEr is running on
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDOUT.
+Supports the same extended form as *[output](#output)*.
 Supports *[templating](#templating)*.
 * stderr: File where to redirect STDERR of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDERR.
-May be the same as `stdout`.
+Supports the same extended form as *[output](#output)*.
+File name may be the same as `stdout`, if that is the case `raw` and `overwrite` are inherited from `stdout`.
 Supports *[templating](#templating)*.
 
 ##### Pre & Post

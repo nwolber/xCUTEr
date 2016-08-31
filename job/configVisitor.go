@@ -27,7 +27,7 @@ type configVisitor interface {
 	Sequential() group
 	Parallel() group
 	Job(name string) group
-	Output(file string) interface{}
+	Output(o *output) interface{}
 	JobLogger(jobName string) interface{}
 	HostLogger(jobName string, h *host) interface{}
 	Timeout(timeout time.Duration) interface{}
@@ -44,8 +44,8 @@ type configVisitor interface {
 	Commands(cmd *command) group
 	Command(cmd *command) interface{}
 	LocalCommand(cmd *command) interface{}
-	Stdout(file string) interface{}
-	Stderr(file string) interface{}
+	Stdout(o *output) interface{}
+	Stderr(o *output) interface{}
 }
 
 type group interface {
@@ -189,14 +189,14 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 	var stdout, stderr interface{}
 	children := builder.Commands(cmd)
 
-	if cmd.Stdout != "" || cmd.Stderr != "" {
-		if cmd.Stdout != "" {
+	if cmd.Stdout != nil || cmd.Stderr != nil {
+		if cmd.Stdout != nil {
 			stdout = builder.Stdout(cmd.Stdout)
 		}
 
 		if cmd.Stderr == cmd.Stdout {
 			stderr = stdout
-		} else if cmd.Stderr != "" {
+		} else if cmd.Stderr != nil {
 			stderr = builder.Stderr(cmd.Stderr)
 		}
 	}
