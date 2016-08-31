@@ -123,12 +123,12 @@ func (s *stringVisitor) Job(name string) group {
 	}
 }
 
-func (s *stringVisitor) Output(file string) interface{} {
-	if file == "" {
+func (s *stringVisitor) Output(o *output) interface{} {
+	if o == nil {
 		return nil
 	}
 
-	return simple("Output: " + file)
+	return simple(fmt.Sprintf("Output: %s", o))
 }
 
 func (s *stringVisitor) JobLogger(jobName string) interface{} {
@@ -302,18 +302,18 @@ func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 	return simple(str)
 }
 
-func (s *stringVisitor) Stdout(file string) interface{} {
-	if file == "null" {
+func (s *stringVisitor) Stdout(o *output) interface{} {
+	if o.File == "null" {
 		return simple("Discard any output from STDOUT")
 	}
 
-	return simple("Redirect STDOUT to " + file)
+	return simple(fmt.Sprintf("Redirect STDOUT to %s", o))
 }
 
-func (s *stringVisitor) Stderr(file string) interface{} {
-	if file == "null" {
+func (s *stringVisitor) Stderr(o *output) interface{} {
+	if o.File == "null" {
 		return simple("Discard any output from STDERR")
 	}
 
-	return simple("Redirect STDERR to " + file)
+	return simple(fmt.Sprintf("Redirect STDERR to %s", o))
 }

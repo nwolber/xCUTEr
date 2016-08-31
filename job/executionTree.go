@@ -5,6 +5,7 @@
 package job
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -12,9 +13,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/nwolber/xCUTEr/flunc"
 )
 
@@ -71,7 +72,7 @@ func (e *executionTreeVisitor) Job(name string) group {
 	return e.Sequential()
 }
 
-func (*executionTreeVisitor) Output(file string) interface{} {
+func (*executionTreeVisitor) Output(o *output) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
@@ -79,7 +80,7 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 			return ctx, nil
 		}
 
-		if file == "" {
+		if o == nil {
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
 
@@ -91,21 +92,17 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 		}
 
 		var err error
-		file, err = tt.Interpolate(file)
+		file, err := tt.Interpolate(o.File)
 		if err != nil {
 			log.Println("error parsing template string", file, err)
 			return nil, err
 		}
 
-		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
+		f, err := openOutputFile(file, o.Raw, o.Overwrite)
 		if err != nil {
 			err = fmt.Errorf("unable to open job output file %s %s", file, err)
 			return nil, err
 		}
-
-		fmt.Fprintln(f)
-		fmt.Fprintln(f)
-		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer) {
 			<-ctx.Done()
@@ -119,6 +116,29 @@ func (*executionTreeVisitor) Output(file string) interface{} {
 
 		return context.WithValue(ctx, outputKey, f), nil
 	})
+}
+
+func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
+	flags := os.O_CREATE | os.O_WRONLY
+	if overwrite {
+		flags |= os.O_TRUNC
+	} else {
+		flags |= os.O_APPEND
+	}
+
+	f, err := os.OpenFile(file, flags, os.FileMode(0644))
+	if err != nil {
+
+		return nil, err
+	}
+
+	if !raw {
+		fmt.Fprintln(f)
+		fmt.Fprintln(f)
+		fmt.Fprintf(f, "============ %s ============\n", time.Now())
+	}
+
+	return f, nil
 }
 
 func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
@@ -416,23 +436,31 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 			return nil, err
 		}
 
-		parts := strings.Split(command, " ")
+		parts, err := shellwords.Parse(command)
+		if err != nil {
+			l.Println("error parsing command line", cmd.Command, err)
+			return nil, err
+		}
 		exe := parts[0]
 		args := parts[1:]
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
-
 		cmd := exec.CommandContext(ctx, exe, args...)
-		cmd.Stdout = stdout
-		if cmd.Stdout == nil {
-			cmd.Stdout = os.Stdout
-		}
 
-		cmd.Stderr = stderr
-		if cmd.Stderr == nil {
-			cmd.Stderr = os.Stderr
+		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		if stdout == nil {
+			stdout = os.Stdout
 		}
+		stdout = bufio.NewWriter(stdout)
+		defer stdout.(*bufio.Writer).Flush()
+		cmd.Stdout = stdout
+
+		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		if stderr == nil {
+			stderr = os.Stderr
+		}
+		stderr = bufio.NewWriter(stderr)
+		defer stderr.(*bufio.Writer).Flush()
+		cmd.Stderr = stderr
 
 		l.Println("executing local command", command)
 		if err := cmd.Run(); err != nil {
@@ -444,9 +472,9 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Stdout(file string) interface{} {
+func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		if file == "null" {
+		if o.File == "null" {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
 		}
 
@@ -464,23 +492,18 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 			return nil, err
 		}
 
-		path, err := tt.Interpolate(file)
+		path, err := tt.Interpolate(o.File)
 		if err != nil {
-			l.Println("error parsing template string", file, err)
+			l.Println("error parsing template string", o.File, err)
 			return nil, err
 		}
-
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
+		f, err := openOutputFile(path, o.Raw, o.Overwrite)
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
 			return nil, err
 		}
 		l.Println("opened", path, "for stdout")
-
-		fmt.Fprintln(f)
-		fmt.Fprintln(f)
-		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()
@@ -492,9 +515,9 @@ func (e *executionTreeVisitor) Stdout(file string) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) Stderr(file string) interface{} {
+func (*executionTreeVisitor) Stderr(o *output) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		if file == "null" {
+		if o.File == "null" {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
 		}
 
@@ -512,23 +535,19 @@ func (*executionTreeVisitor) Stderr(file string) interface{} {
 			return nil, err
 		}
 
-		path, err := tt.Interpolate(file)
+		path, err := tt.Interpolate(o.File)
 		if err != nil {
-			l.Println("error parsing template string", file, err)
+			l.Println("error parsing template string", o.File, err)
 			return nil, err
 		}
+		f, err := openOutputFile(path, o.Raw, o.Overwrite)
 
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0644))
 		if err != nil {
 			err = fmt.Errorf("unable to open stdout file: %s", err)
 			l.Println(err)
 			return nil, err
 		}
 		l.Println("opened", path, "for stderr")
-
-		fmt.Fprintln(f)
-		fmt.Fprintln(f)
-		fmt.Fprintf(f, "============ %s ============\n", time.Now())
 
 		go func(ctx context.Context, f io.Closer, path string) {
 			<-ctx.Done()
