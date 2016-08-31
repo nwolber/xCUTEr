@@ -12,9 +12,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/nwolber/xCUTEr/flunc"
 )
 
@@ -416,7 +416,11 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 			return nil, err
 		}
 
-		parts := strings.Split(command, " ")
+		parts, err := shellwords.Parse(command)
+		if err != nil {
+			l.Println("error parsing command line", cmd.Command, err)
+			return nil, err
+		}
 		exe := parts[0]
 		args := parts[1:]
 
