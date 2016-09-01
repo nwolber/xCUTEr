@@ -183,17 +183,25 @@ const (
 	shellLineComments = "#"
 )
 
+var (
+	commentRegex *regexp.Regexp
+)
+
 // removeLineComments removes any line from r that starts with indictor
 // after removing preceding whitespace (according to unicode.IsSpace).
 func removeLineComments(r io.Reader, indicator string) io.Reader {
 	s := bufio.NewScanner(r)
 	r, w := io.Pipe()
+
+	if commentRegex == nil {
+		commentRegex = regexp.MustCompile("\\s*\\/\\/.*")
+	}
+
 	go func() {
 		for s.Scan() {
 			line := strings.TrimLeftFunc(s.Text(), unicode.IsSpace)
-			if strings.HasPrefix(line, indicator) {
-				continue
-			}
+			line = commentRegex.ReplaceAllString(line, "")
+
 			if _, err := fmt.Fprintln(w, line); err != nil {
 				w.CloseWithError(err)
 				return
