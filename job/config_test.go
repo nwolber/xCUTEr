@@ -48,6 +48,7 @@ func TestUnmarshalOutput(t *testing.T) {
 func TestParseConfig(t *testing.T) {
 	input := `{
         // comment
+		"name": "this is the name" // yes it is
     }`
 
 	_, err := parseConfig(bytes.NewReader([]byte(input)))

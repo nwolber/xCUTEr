@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 	"text/template"
@@ -166,44 +166,56 @@ type command struct {
 	Stderr   *output    `json:"stderr,omitempty"`
 }
 
-// func (c *command) String() string {
-// 	return fmt.Sprintf("Command:%q, Commands:%q, Flow:%q, Stdout:%q, Stderr:%q", c.Command)
-// }
-
 // ReadConfig parses the file into a Config.
 func ReadConfig(file string) (*Config, error) {
-	b, err := ioutil.ReadFile(file)
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
-	c, err := parseConfig(bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
+	return parseConfig(f)
 }
 
-func parseConfig(r io.Reader) (*Config, error) {
+const (
+	// C-style line comments
+	cLineComments     = "//"
+	shellLineComments = "#"
+)
+
+var (
+	commentRegex *regexp.Regexp
+)
+
+// removeLineComments removes any line from r that starts with indictor
+// after removing preceding whitespace (according to unicode.IsSpace).
+func removeLineComments(r io.Reader, indicator string) io.Reader {
 	s := bufio.NewScanner(r)
 	r, w := io.Pipe()
+
+	if commentRegex == nil {
+		commentRegex = regexp.MustCompile("\\s*\\/\\/.*")
+	}
+
 	go func() {
 		for s.Scan() {
 			line := strings.TrimLeftFunc(s.Text(), unicode.IsSpace)
-			if strings.HasPrefix(line, "//") {
-				continue
+			line = commentRegex.ReplaceAllString(line, "")
+
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				w.CloseWithError(err)
+				return
 			}
-			fmt.Fprintf(w, line)
 		}
 
-		if err := s.Err(); err != nil {
-			w.CloseWithError(err)
-		} else {
-			w.Close()
-		}
+		w.CloseWithError(s.Err())
 	}()
 
+	return r
+}
+
+func parseConfig(r io.Reader) (*Config, error) {
+	r = removeLineComments(r, cLineComments)
 	d := json.NewDecoder(r)
 
 	var c Config
@@ -211,19 +223,26 @@ func parseConfig(r io.Reader) (*Config, error) {
 	return &c, err
 }
 
-func loadHostsFile(file *hostsFile) (*hostConfig, error) {
-	var hosts hostConfig
-
-	b, err := ioutil.ReadFile(file.File)
+func readHostsFile(file *hostsFile) (*hostConfig, error) {
+	f, err := os.Open(file.File)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
-	if err = json.Unmarshal(b, &hosts); err != nil {
+	return parseHostsFile(f, file.Pattern, file.MatchString)
+}
+
+func parseHostsFile(r io.Reader, pattern, matchString string) (*hostConfig, error) {
+	r = removeLineComments(r, cLineComments)
+	d := json.NewDecoder(r)
+
+	var hosts hostConfig
+	if err := d.Decode(&hosts); err != nil {
 		return nil, err
 	}
 
-	regex, err := regexp.Compile(file.Pattern)
+	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -235,11 +254,10 @@ func loadHostsFile(file *hostsFile) (*hostConfig, error) {
 		}
 
 		matchString := k
-		if file.MatchString != "" {
-			matchString, err = interpolate(file.MatchString, host)
+		if matchString != "" {
+			matchString, err = interpolate(matchString, host)
 			if err != nil {
-				log.Printf("string interpolation failed for match string %q and host %#v: %s", file.MatchString, host, err)
-				return nil, err
+				return nil, fmt.Errorf("string interpolation failed for match string %q and host %#v: %s", matchString, host, err)
 			}
 
 			if matchString == "" {
