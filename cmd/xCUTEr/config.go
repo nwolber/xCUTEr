@@ -26,7 +26,7 @@ func config() (jobDir string, sshTTL time.Duration, file, logFile, perf string, 
 	flag.DurationVar(&sshTTL, "sshTTL", sshTTLDefault, "Time until an unused SSH connection is closed")
 	flag.StringVar(&file, "file", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
-	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turining off log messages. Command output is still printed. Overwrites -log.")
+	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turning off log messages. Command output is still printed. Overwrites -log.")
 	flag.StringVar(&logFile, "log", logFileDefault, "Log file")
 	flag.StringVar(&perf, "perf", defaultPerf, "Perf endpoint")
 
