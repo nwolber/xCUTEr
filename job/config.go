@@ -156,14 +156,15 @@ type scpData struct {
 }
 
 type command struct {
-	Name     string     `json:"name,omitempty"`
-	Command  string     `json:"command,omitempty"`
-	Commands []*command `json:"commands,omitempty"`
-	Flow     string     `json:"flow,omitempty"`
-	Target   string     `json:"target,omitempty"`
-	Retries  uint       `json:"retries,omitempty"`
-	Stdout   *output    `json:"stdout,omitempty"`
-	Stderr   *output    `json:"stderr,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Command     string     `json:"command,omitempty"`
+	Commands    []*command `json:"commands,omitempty"`
+	Flow        string     `json:"flow,omitempty"`
+	Target      string     `json:"target,omitempty"`
+	Retries     uint       `json:"retries,omitempty"`
+	IgnoreError bool       `json:"ignoreError,omitempty"`
+	Stdout      *output    `json:"stdout,omitempty"`
+	Stderr      *output    `json:"stderr,omitempty"`
 }
 
 // ReadConfig parses the file into a Config.

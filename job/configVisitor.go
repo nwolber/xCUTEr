@@ -232,6 +232,10 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 		wrappedChildren = builder.Retry(wrappedChildren, cmd.Retries)
 	}
 
+	if cmd.IgnoreError {
+		wrappedChildren = builder.ErrorSafeguard(wrappedChildren)
+	}
+
 	return wrappedChildren, nil
 }
 
