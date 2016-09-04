@@ -5,19 +5,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 
-	_ "net/http/pprof"
+	"github.com/nwolber/xCUTEr/job"
 
-	"github.com/nwolber/xCUTEr"
+	_ "net/http/pprof"
 )
 
 func main() {
-	jobDir, sshTTL, file, logFile, perf, once, quiet := config()
+	// jobDir, sshTTL, file, logFile, perf, once, quiet := config()
+	_, sshTTL, file, _, perf, _, _ := config()
 
 	if perf != "" {
 		go func() {
@@ -28,19 +30,40 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
 
-	x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	x.Start()
+	// x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
+	// x.Start()
+	job.InitializeSSHClientStore(sshTTL)
 
-	select {
-	case <-x.Done:
-	case s := <-signals:
-		fmt.Println("Got signal:", s)
-		x.Stop()
-		x.Cancel()
-	}
+	c, _ := job.ReadConfig(file)
+	info, _ := job.Instrument(c)
 
+	f, updates := info.GetFlunc()
+
+	go f(context.WithValue(context.Background(), "output", os.Stdout))
+
+	tree := ""
+loop:
+	for {
+		select {
+		// case <-x.Done:
+		case text, ok := <-updates:
+			if !ok {
+				break loop
+			}
+
+			// fmt.Println(text)
+			tree = text
+		case s := <-signals:
+			fmt.Println("Got signal:", s)
+			// x.Stop()
+			// x.Cancel()
+			break loop
+		}
+	}
 	log.Println("fin")
+
+	fmt.Println(tree)
 }

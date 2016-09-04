@@ -21,7 +21,7 @@ import (
 )
 
 func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) error {
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -86,7 +86,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) er
 
 func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.ServerConfig, verbose bool) {
 	defer nConn.Close()
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -131,7 +131,7 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 }
 
 func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Request, verbose bool) {
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -162,7 +162,7 @@ func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Requ
 func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
 	defer channel.Close()
 
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -200,7 +200,7 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
 	defer channel.Close()
 
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
