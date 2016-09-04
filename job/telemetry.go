@@ -7,7 +7,9 @@ package job
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"runtime"
 	"strings"
 	"time"
 
@@ -125,7 +127,15 @@ type node interface {
 	Typ() string
 	Status(status NodeStatus, text string)
 	Exec() flunc.Flunc
+	Log(t time.Time, file string, line int, message string)
 	stringer
+}
+
+// A LogMessage .
+type LogMessage struct {
+	Timestamp     time.Time
+	Line          int
+	File, Message string
 }
 
 type simpleNode struct {
@@ -134,6 +144,7 @@ type simpleNode struct {
 	str    stringer
 	status NodeStatus
 	text   string
+	log    []*LogMessage
 	v      *vars
 }
 
@@ -150,6 +161,15 @@ func (n *simpleNode) Exec() flunc.Flunc {
 	return n.exec
 }
 
+func (n *simpleNode) Log(t time.Time, file string, line int, message string) {
+	n.log = append(n.log, &LogMessage{
+		Timestamp: t,
+		File:      file,
+		Line:      line,
+		Message:   message,
+	})
+}
+
 var (
 	yellow = color.New(color.FgYellow).SprintFunc()
 	green  = color.New(color.FgGreen).SprintFunc()
@@ -157,10 +177,6 @@ var (
 )
 
 func formatString(str string, status NodeStatus, text string) string {
-	if text != "" {
-		text = ": " + text
-	}
-
 	var color func(a ...interface{}) string
 	switch status {
 	case RunningNode:
@@ -174,12 +190,16 @@ func formatString(str string, status NodeStatus, text string) string {
 		color = red
 	}
 
+	if text != "" {
+		str += ": " + text
+	}
+
 	if color != nil {
 		index := strings.Index(str, "\n")
 		if index >= 0 {
-			str = color(str[:index]+text) + str[index:]
+			str = color(str[:index]) + str[index:]
 		} else {
-			str = color(str + text)
+			str = color(str)
 		}
 	}
 
@@ -189,19 +209,201 @@ func formatString(str string, status NodeStatus, text string) string {
 func (n *simpleNode) String(v *vars) string {
 	str := ""
 	if n.v != nil {
-		str = n.str.String(v)
+		str = n.str.String(n.v)
 	} else {
 		str = n.str.String(v)
 	}
 
-	return formatString(str, n.status, n.text)
+	text := n.text
+	if text == "" && len(n.log) > 0 {
+		text = "\n"
+		for _, msg := range n.log {
+			text += fmt.Sprintf("%s %s:%d %s\n", msg.Timestamp, msg.File, msg.Line, msg.Message)
+		}
+	}
+
+	return formatString(str, n.status, text)
 }
 
+// Logger is an interface for loggers. It is satisfied by log.Logger.
+type Logger interface {
+	SetOutput(w io.Writer)
+	Flags() int
+	SetFlags(flag int)
+	Prefix() string
+	SetPrefix(prefix string)
+	Print(v ...interface{})
+	Printf(format string, v ...interface{})
+	Println(v ...interface{})
+	Fatal(v ...interface{})
+	Fatalf(format string, v ...interface{})
+	Fatalln(v ...interface{})
+	Panic(v ...interface{})
+	Panicf(format string, v ...interface{})
+	Panicln(v ...interface{})
+	Output(calldepth int, s string) error
+}
+
+type interceptLogger struct {
+	l, orig Logger
+	log     func(t time.Time, file string, line int, message string)
+}
+
+func (l *interceptLogger) Log(t time.Time, message string) {
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		file = "???"
+	}
+
+	if l := len(message); message[l-1] == '\n' {
+		message = message[:l-1]
+	}
+
+	l.log(t, file, line, message)
+}
+
+func (l *interceptLogger) SetOutput(w io.Writer) {
+	if l.orig != nil {
+		l.orig.SetOutput(w)
+	}
+}
+
+func (l *interceptLogger) Flags() int {
+	if l.orig == nil {
+		return 0
+	}
+	return l.orig.Flags()
+}
+
+func (l *interceptLogger) SetFlags(flag int) {
+	if l.orig != nil {
+		l.orig.SetFlags(flag)
+	}
+}
+
+func (l *interceptLogger) Prefix() string {
+	if l.orig == nil {
+		return ""
+	}
+	return l.orig.Prefix()
+}
+
+func (l *interceptLogger) SetPrefix(prefix string) {
+	if l.orig != nil {
+		l.orig.SetPrefix(prefix)
+	}
+}
+
+func (l *interceptLogger) Print(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Print(v...)
+	}
+}
+
+func (l *interceptLogger) Printf(format string, v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintf(format, v...))
+	if l.orig != nil {
+		l.orig.Printf(format, v...)
+	}
+}
+
+func (l *interceptLogger) Println(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Println(v...)
+	}
+}
+
+func (l *interceptLogger) Fatal(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Fatal(v...)
+	}
+}
+
+func (l *interceptLogger) Fatalf(format string, v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintf(format, v...))
+	if l.orig != nil {
+		l.orig.Fatalf(format, v...)
+	}
+}
+
+func (l *interceptLogger) Fatalln(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Fatalln(v...)
+	}
+}
+
+func (l *interceptLogger) Panic(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Panic(v...)
+	}
+}
+
+func (l *interceptLogger) Panicf(format string, v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintf(format, v...))
+	if l.orig != nil {
+		l.orig.Panicf(format, v...)
+	}
+}
+
+func (l *interceptLogger) Panicln(v ...interface{}) {
+	l.Log(time.Now(), fmt.Sprintln(v...))
+	if l.orig != nil {
+		l.orig.Panicln(v...)
+	}
+}
+
+func (l *interceptLogger) Output(calldepth int, s string) error {
+	if l.orig == nil {
+		return nil
+	}
+	return l.orig.Output(calldepth, s)
+}
+
+type interceptContext struct {
+	context.Context
+}
+
+func (ctx *interceptContext) Deadline() (deadline time.Time, ok bool) { return ctx.Context.Deadline() }
+func (ctx *interceptContext) Done() <-chan struct{}                   { return ctx.Context.Done() }
+func (ctx *interceptContext) Err() error                              { return ctx.Context.Err() }
+func (ctx *interceptContext) Value(key interface{}) interface{}       { return ctx.Context.Value(key) }
+
 func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) flunc.Flunc {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return makeFlunc(func(origCtx context.Context) (context.Context, error) {
+		tt, _ := origCtx.Value(templatingKey).(*templatingEngine)
+		if tt != nil {
+			switch nn := n.(type) {
+			case *simpleNode:
+				nn.v = &vars{tt: tt}
+			case *nodeGroup:
+				nn.v = &vars{tt: tt}
+			}
+		}
+
+		origLogger, ok := origCtx.Value(loggerKey).(Logger)
+		for ok {
+			var l *interceptLogger
+			l, ok = origLogger.(*interceptLogger)
+			if !ok {
+				break
+			}
+
+			origLogger = l.orig
+		}
+
+		ctx := context.WithValue(origCtx, loggerKey, &interceptLogger{orig: origLogger, log: n.Log})
+		interceptCtx := &interceptContext{Context: ctx}
+
 		n.Status(RunningNode, "")
 		update(RunningNode, n.Typ(), "")
-		newCtx, err := f(ctx)
+
+		newCtx, err := f(interceptCtx)
+
 		if err == nil {
 			n.Status(CompletedNode, "")
 			update(CompletedNode, n.Typ(), "")
@@ -209,6 +411,11 @@ func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) 
 			n.Status(FailedNode, err.Error())
 			update(FailedNode, n.Typ(), err.Error())
 		}
+
+		// The interceptContext is now the parent of all modifications to the context
+		// made by f. By retargeting the incerceptContext at the original context,
+		// we effectivly remove the interceptLogger from the context
+		interceptCtx.Context = origCtx
 
 		return newCtx, err
 	})
@@ -227,6 +434,7 @@ type nodeGroup struct {
 	exec     *executionGroup
 	str      stringerGroup
 	update   func(NodeStatus, string, string)
+	v        *vars
 }
 
 func (g *nodeGroup) Append(children ...interface{}) {
@@ -265,12 +473,14 @@ func (g *nodeGroup) Status(status NodeStatus, text string) {
 	}
 }
 
+func (*nodeGroup) Log(t time.Time, file string, line int, message string) {}
+
 func (g *nodeGroup) Exec() flunc.Flunc {
 	return instrument(g.update, g, g.exec.Wrap().(flunc.Flunc))
 }
 
 func (g *nodeGroup) String(v *vars) string {
-	return formatString(g.str.String(v), g.status, g.text)
+	return formatString(g.str.String(g.v), g.status, g.text)
 }
 
 type telemetryBuilder struct {
@@ -408,7 +618,7 @@ func (t *telemetryBuilder) Retry(child interface{}, retries uint) interface{} {
 	var n simpleNode
 	n.typ = "Retry"
 	n.str = t.str.Retry(child, retries).(stringer)
-	n.exec = instrument(t.update, &n, t.exec.Retry(child, retries).(flunc.Flunc))
+	n.exec = instrument(t.update, &n, t.exec.Retry(child.(node).Exec(), retries).(flunc.Flunc))
 	return &n
 }
 
@@ -416,16 +626,8 @@ func (t *telemetryBuilder) Templating(c *Config, h *host) interface{} {
 	var n simpleNode
 	n.typ = "Templating"
 	n.str = t.str.Templating(c, h).(stringer)
+	n.exec = instrument(t.update, &n, t.exec.Templating(c, h).(flunc.Flunc))
 
-	f := t.exec.Templating(c, h).(flunc.Flunc)
-	wrapper := func(ctx context.Context) (context.Context, error) {
-		newCtx, err := f(ctx)
-		n.v = &vars{
-			tt: newCtx.Value(templatingKey).(*templatingEngine),
-		}
-		return newCtx, err
-	}
-	n.exec = instrument(t.update, &n, wrapper)
 	return &n
 }
 

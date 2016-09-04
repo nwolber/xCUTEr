@@ -179,7 +179,7 @@ func keyboardInteractiveChallenge(user string, keyboardInteractive map[string]st
 }
 
 func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
-	l, ok := ctx.Value(loggerKey).(*log.Logger)
+	l, ok := ctx.Value(loggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}

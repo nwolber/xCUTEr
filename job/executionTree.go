@@ -176,7 +176,7 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 
 func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -193,7 +193,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 
 func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -228,7 +228,7 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	}
 
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -270,7 +270,7 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 	}
 
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -303,7 +303,7 @@ func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 
 func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -324,7 +324,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 
 func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -347,7 +347,7 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 
 func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -374,7 +374,7 @@ func (e *executionTreeVisitor) Commands(cmd *command) group {
 
 func (*executionTreeVisitor) Command(cmd *command) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -416,7 +416,7 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 
 func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 	return makeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -478,7 +478,7 @@ func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
 		}
 
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
@@ -521,7 +521,7 @@ func (*executionTreeVisitor) Stderr(o *output) interface{} {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
 		}
 
-		l, ok := ctx.Value(loggerKey).(*log.Logger)
+		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
 			log.Println(err)
