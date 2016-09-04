@@ -5,21 +5,19 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 
-	"github.com/nwolber/xCUTEr/job"
-
 	_ "net/http/pprof"
+
+	"github.com/nwolber/xCUTEr"
 )
 
 func main() {
-	// jobDir, sshTTL, file, logFile, perf, once, quiet := config()
-	_, sshTTL, file, _, perf, _, _ := config()
+	jobDir, sshTTL, file, logFile, perf, once, quiet := config()
 
 	if perf != "" {
 		go func() {
@@ -30,40 +28,19 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
 
-	// x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	// x.Start()
-	job.InitializeSSHClientStore(sshTTL)
-
-	c, _ := job.ReadConfig(file)
-	info, _ := job.Instrument(c)
-
-	f, updates := info.GetFlunc()
-
-	go f(context.WithValue(context.Background(), "output", os.Stdout))
-
-	tree := ""
-loop:
-	for {
-		select {
-		// case <-x.Done:
-		case text, ok := <-updates:
-			if !ok {
-				break loop
-			}
-
-			// fmt.Println(text)
-			tree = text
-		case s := <-signals:
-			fmt.Println("Got signal:", s)
-			// x.Stop()
-			// x.Cancel()
-			break loop
-		}
+	x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
+	if err != nil {
+		log.Fatalln(err)
 	}
-	log.Println("fin")
+	x.Start()
 
-	fmt.Println(tree)
+	select {
+	case <-x.Done:
+	case s := <-signals:
+		fmt.Println("Got signal:", s)
+		x.Stop()
+		x.Cancel()
+	}
+
+	log.Println("fin")
 }
