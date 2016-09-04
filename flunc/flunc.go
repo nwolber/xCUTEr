@@ -14,7 +14,7 @@ type Flunc func(context.Context) (context.Context, error)
 // are propagated to later running Fluncs.
 //
 // If a Flunc returns an error, execution of following Fluncs is canceled and
-// the error is returned to the caller of Sequential.
+// the error is returned to the calling Flunc.
 func Sequential(children ...Flunc) Flunc {
 	return func(ctx context.Context) (context.Context, error) {
 		for _, child := range children {
@@ -42,13 +42,13 @@ func Sequential(children ...Flunc) Flunc {
 	}
 }
 
-// Parallel executes the given Fluncs in parallel. Because of the nature of parallelism
+// Parallel executes the given Fluncs concurrently. Because of the nature of concurrency
 // context manipulations are neither propagated to sibling nor to parent Fluncs. The
 // first return value is always nil.
 //
 // If a Flunc returns an error, the context handed to its sibling Fluncs is canceled
 // (context.Context.Done is closed). Siblings should honor this and stop execution,
-// although this is not enforced. The error is returned to the caller of Parallel.
+// although this is not enforced. The error is returned to the calling Flunc.
 //
 // If more than one Flunc errors at a time, there is a race, which error gets to
 // read first. Later errors will be lost.
@@ -73,7 +73,10 @@ func Parallel(children ...Flunc) Flunc {
 
 			go func(ctx context.Context, child Flunc, done chan error) {
 				_, err := child(ctx)
-				done <- err
+				select {
+				case done <- err:
+				case <-ctx.Done():
+				}
 			}(childCtx, child, done)
 		}
 
