@@ -54,3 +54,39 @@ func TestParseConfig(t *testing.T) {
 	_, err := parseConfig(bytes.NewReader([]byte(input)))
 	expect(t, nil, err)
 }
+
+func TestFilterHosts(t *testing.T) {
+	pattern := "Leet Corporation"
+	matchString := "{{.Tags.provider}}"
+
+	host1Name := "Fancy server"
+	host1 := &host{
+		Addr:     "thaddeus.example.com",
+		Port:     1337,
+		User:     "me",
+		Password: "secret",
+		Tags: map[string]string{
+			"provider": "Leet Corporation",
+		},
+	}
+
+	host2Name := "Crappy box"
+	host2 := &host{
+		Addr:     "eugene.example.com",
+		Port:     15289,
+		User:     "me",
+		Password: "",
+		Tags: map[string]string{
+			"provider": "Me PLC",
+		},
+	}
+
+	hosts := hostConfig{
+		host1Name: host1,
+		host2Name: host2,
+	}
+
+	got, err := filterHosts(hosts, pattern, matchString)
+	expect(t, nil, err)
+	expect(t, 1, len(got))
+}

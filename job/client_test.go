@@ -16,7 +16,7 @@ import (
 
 func expect(t *testing.T, want, got interface{}) {
 	if want != got {
-		t.Errorf("want %q, got: %q", want, got)
+		t.Errorf("want <%T>%+v, got: <%T>%+v", want, want, got, got)
 	}
 }
 

@@ -224,7 +224,7 @@ func parseConfig(r io.Reader) (*Config, error) {
 	return &c, err
 }
 
-func readHostsFile(file *hostsFile) (*hostConfig, error) {
+func readHostsFile(file *hostsFile) (hostConfig, error) {
 	f, err := os.Open(file.File)
 	if err != nil {
 		return nil, err
@@ -234,7 +234,7 @@ func readHostsFile(file *hostsFile) (*hostConfig, error) {
 	return parseHostsFile(f, file.Pattern, file.MatchString)
 }
 
-func parseHostsFile(r io.Reader, pattern, matchString string) (*hostConfig, error) {
+func parseHostsFile(r io.Reader, pattern, matchString string) (hostConfig, error) {
 	r = removeLineComments(r, cLineComments)
 	d := json.NewDecoder(r)
 
@@ -243,20 +243,24 @@ func parseHostsFile(r io.Reader, pattern, matchString string) (*hostConfig, erro
 		return nil, err
 	}
 
+	return filterHosts(hosts, pattern, matchString)
+}
+
+func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, err
 	}
 
 	filteredHosts := make(hostConfig)
-	for k, host := range hosts {
+	for name, host := range hosts {
 		if host.Name == "" {
-			host.Name = k
+			host.Name = name
 		}
 
-		matchString := k
+		str := name
 		if matchString != "" {
-			matchString, err = interpolate(matchString, host)
+			str, err = interpolate(matchString, host)
 			if err != nil {
 				return nil, fmt.Errorf("string interpolation failed for match string %q and host %#v: %s", matchString, host, err)
 			}
@@ -266,12 +270,11 @@ func parseHostsFile(r io.Reader, pattern, matchString string) (*hostConfig, erro
 			}
 		}
 
-		if regex.MatchString(matchString) {
-			filteredHosts[k] = host
+		if regex.MatchString(str) {
+			filteredHosts[name] = host
 		}
 	}
-
-	return &filteredHosts, nil
+	return filteredHosts, nil
 }
 
 func interpolate(text string, h *host) (string, error) {

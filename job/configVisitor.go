@@ -109,7 +109,7 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 		}
 
 		hostFluncs := builder.Hosts()
-		for _, host := range *hosts {
+		for _, host := range hosts {
 			host, err := visitHost(builder, c, host)
 			if err != nil {
 				return nil, err
