@@ -350,12 +350,16 @@ The object provided for templating is the following:
 type Data struct {
     Config *Config
     Host *host
+    Env map[string]string
 }
 ```
 * Config: Contains the whole config from the job configuration file.
 The property names are the same, except they use a capital letter at the beginning.
 * Host: The host definition of the current host.
 Only meaningful for `command`, `stdout` and `stderr`.
+* Env: Environment variables.
+To output the environment variable `VAR` use `{{.Env.VAR}}`.
+Environment variables are case-sensitive. 
 
 Additionally there are three functions:
 ```go

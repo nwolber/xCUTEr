@@ -7,6 +7,8 @@ package job
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -14,13 +16,28 @@ import (
 type templatingEngine struct {
 	Config *Config
 	Host   *host
+	Env    map[string]string
 	now    func() time.Time
+}
+
+func getEnv() map[string]string {
+	env := make(map[string]string)
+	for _, e := range os.Environ() {
+		index := strings.Index(e, "=")
+		key, value := e[:index], e[index+1:]
+		env[key] = value
+	}
+
+	fmt.Printf("%#v\n", env)
+
+	return env
 }
 
 func newTemplatingEngine(c *Config, h *host) *templatingEngine {
 	return &templatingEngine{
 		Config: c,
 		Host:   h,
+		Env:    getEnv(),
 		now:    time.Now,
 	}
 }
@@ -50,10 +67,12 @@ func (t *templatingEngine) Interpolate(templ string) (string, error) {
 	data := struct {
 		Config *Config
 		Host   *host
+		Env    map[string]string
 		Now    time.Time
 	}{
 		Config: t.Config,
 		Host:   t.Host,
+		Env:    t.Env,
 		Now:    time.Now(),
 	}
 
