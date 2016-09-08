@@ -194,7 +194,7 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 			stdout = builder.Stdout(cmd.Stdout)
 		}
 
-		if cmd.Stderr == cmd.Stdout {
+		if cmd.Stdout != nil && cmd.Stderr != nil && cmd.Stderr.File == cmd.Stdout.File {
 			stderr = stdout
 		} else if cmd.Stderr != nil {
 			stderr = builder.Stderr(cmd.Stderr)
