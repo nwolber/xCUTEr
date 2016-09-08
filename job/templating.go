@@ -28,8 +28,6 @@ func getEnv() map[string]string {
 		env[key] = value
 	}
 
-	fmt.Printf("%#v\n", env)
-
 	return env
 }
 
