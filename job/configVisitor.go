@@ -135,13 +135,14 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 // localCommand turns any command in a command that is only executed locally
 func localCommand(c *command) *command {
 	lc := &command{
-		Name:    c.Name,
-		Command: c.Command,
-		Flow:    c.Flow,
-		Target:  "local",
-		Retries: c.Retries,
-		Stdout:  c.Stdout,
-		Stderr:  c.Stderr,
+		Name:        c.Name,
+		Command:     c.Command,
+		Flow:        c.Flow,
+		Target:      "local",
+		IgnoreError: c.IgnoreError,
+		Retries:     c.Retries,
+		Stdout:      c.Stdout,
+		Stderr:      c.Stderr,
 	}
 
 	if len(c.Commands) > 0 {
