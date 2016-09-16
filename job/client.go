@@ -87,8 +87,6 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			defer store.m.Unlock()
 			if _, ok := store.clients[key]; ok {
 				delete(store.clients, key)
-			} else {
-				log.Println("didn't find a client to remove")
 			}
 		}(client)
 
