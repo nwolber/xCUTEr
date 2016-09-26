@@ -47,7 +47,7 @@ func InitializeSSHClientStore(ttl time.Duration) {
 	go func() {
 		for {
 			watchTime := time.Duration(float64(ttl.Nanoseconds()) * 0.1)
-			<-time.Tick(watchTime)
+			<-time.After(watchTime)
 
 			func() {
 				store.m.Lock()
