@@ -58,6 +58,7 @@ func InitializeSSHClientStore(ttl time.Duration) {
 						log.Println("connection to", key, "unused for", diff, "closing")
 						elem.client.c.Close()
 						delete(store.clients, key)
+						close(elem.client.trashed)
 					}
 				}
 			}()
@@ -88,6 +89,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			if _, ok := store.clients[key]; ok {
 				delete(store.clients, key)
 			}
+			close(client.trashed)
 		}(client)
 
 		elem = &storeElement{
@@ -113,10 +115,11 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 }
 
 type sshClient struct {
-	c *ssh.Client
+	c       *ssh.Client
+	trashed chan struct{}
 }
 
-func createClient(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+var createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{},
@@ -155,7 +158,8 @@ func createClient(addr, user, keyFile, password string, keyboardInteractive map[
 
 	log.Println("connected to", addr)
 	return &sshClient{
-		c: client,
+		c:       client,
+		trashed: make(chan struct{}),
 	}, nil
 }
 

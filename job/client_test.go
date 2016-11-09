@@ -10,6 +10,7 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -89,6 +90,78 @@ func TestKINoQuestions(t *testing.T) {
 	})
 	answers, _ := c(user, "", []string{}, nil)
 	expect(t, 0, len(answers))
+}
+
+func TestConnectionTimeout(t *testing.T) {
+	conn := &errorConn{
+		c:   make(chan struct{}),
+		err: errors.New("errorConn closed"),
+	}
+
+	createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+		return &sshClient{
+			c:       &ssh.Client{Conn: conn},
+			trashed: make(chan struct{}),
+		}, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	InitializeSSHClientStore(time.Hour * 24 * 365)
+
+	client1, err := newSSHClient(ctx, "", "", "", "", nil)
+	expect(t, nil, err)
+
+	if client1 == nil {
+		t.Fatalf("Expected client1 to be non-nil")
+	}
+
+	close(conn.c)
+	<-client1.trashed
+
+	client2, err := newSSHClient(ctx, "", "", "", "", nil)
+	expect(t, nil, err)
+
+	if client2 == nil {
+		t.Fatalf("Expected client2 to be non-nil")
+	}
+
+	if client1 == client2 {
+		t.Fatalf("Expected to get a new client, got the old one")
+	}
+}
+
+type errorConn struct {
+	c   chan struct{}
+	err error
+}
+
+func (e *errorConn) User() string { return "no user" }
+
+func (e *errorConn) SessionID() []byte { return []byte{} }
+
+func (e *errorConn) ClientVersion() []byte { return []byte{} }
+
+func (e *errorConn) ServerVersion() []byte { return []byte{} }
+
+func (e *errorConn) RemoteAddr() net.Addr { panic("") }
+
+func (e *errorConn) LocalAddr() net.Addr { panic("") }
+
+func (e *errorConn) SendRequest(name string, wantReply bool, payload []byte) (bool, []byte, error) {
+	return false, []byte{}, nil
+}
+
+func (e *errorConn) OpenChannel(name string, data []byte) (ssh.Channel, <-chan *ssh.Request, error) {
+	return nil, nil, errors.New("error")
+}
+
+func (e *errorConn) Close() error { return nil }
+
+func (e *errorConn) Wait() error {
+	<-e.c
+	return e.err
 }
 
 type testServer struct {
