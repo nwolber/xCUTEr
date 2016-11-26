@@ -69,10 +69,13 @@ func InitializeSSHClientStore(ttl time.Duration) {
 func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)
 
-	store.m.Lock()
-	defer store.m.Unlock()
+	elem, ok := func() (*storeElement, bool) {
+		store.m.Lock()
+		defer store.m.Unlock()
 
-	elem, ok := store.clients[key]
+		elem, ok := store.clients[key]
+		return elem, ok
+	}()
 
 	if !ok {
 		client, err := createClient(addr, user, keyFile, password, keyboardInteractive)
@@ -92,11 +95,17 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			close(client.trashed)
 		}(client)
 
+		store.m.Lock()
+		defer store.m.Unlock()
+
 		elem = &storeElement{
 			client: client,
 		}
 		store.clients[key] = elem
 	} else {
+		store.m.Lock()
+		defer store.m.Unlock()
+
 		log.Println("reusing existing connection")
 	}
 
@@ -108,7 +117,10 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		store.m.Lock()
 		defer store.m.Unlock()
 
-		store.clients[key].ref--
+		elem, ok := store.clients[key]
+		if ok {
+			elem.ref--
+		}
 	}(ctx, elem.client)
 
 	return elem.client, nil

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,13 @@ func expect(t *testing.T, want, got interface{}) {
 	if want != got {
 		t.Errorf("want <%T>%+v, got: <%T>%+v", want, want, got, got)
 	}
+}
+
+func TestMain(m *testing.M) {
+	InitializeSSHClientStore(time.Hour * 24 * 365)
+
+	retCode := m.Run()
+	os.Exit(retCode)
 }
 
 func TestCreateClient(t *testing.T) {
@@ -50,7 +58,7 @@ func TestCreateClient(t *testing.T) {
 
 	config.AddHostKey(key)
 
-	s, err := newSSHTestServer(config)
+	s, err := newSSHTestServer(config, 0)
 	if err != nil {
 		t.Fatal("expected nil, got", err)
 	}
@@ -76,7 +84,7 @@ func (s *testServer) Close() {
 	s.listener.Close()
 }
 
-func newSSHTestServer(config *ssh.ServerConfig) (*testServer, error) {
+func newSSHTestServer(config *ssh.ServerConfig, sleepPeriod time.Duration) (*testServer, error) {
 	s := &testServer{}
 	var ctx context.Context
 	ctx, s.cancel = context.WithCancel(context.Background())
@@ -85,15 +93,26 @@ func newSSHTestServer(config *ssh.ServerConfig) (*testServer, error) {
 
 	go func() {
 		conn, err := s.listener.Accept()
+
 		if err != nil {
 			// log.Println("sshtest: error accepting connection", err)
 			return
+		}
+
+		select {
+		case <-time.After(sleepPeriod):
+		case <-ctx.Done():
 		}
 
 		_, chans, reqs, err := ssh.NewServerConn(conn, config)
 		if err != nil {
 			fmt.Println("error opening server conn", err)
 			return
+		}
+
+		select {
+		case <-time.After(sleepPeriod):
+		case <-ctx.Done():
 		}
 
 		go ssh.DiscardRequests(reqs)
@@ -106,12 +125,23 @@ func newSSHTestServer(config *ssh.ServerConfig) (*testServer, error) {
 						fmt.Println("new connection channel close")
 						return
 					}
+
+					select {
+					case <-time.After(sleepPeriod):
+					case <-ctx.Done():
+					}
+
 					channel, _, err := newChannel.Accept()
 					if err != nil {
 						fmt.Println("error accepting new channel", err)
 					}
 
 					atomic.AddInt32(&s.successfulConnections, 1)
+
+					select {
+					case <-time.After(sleepPeriod):
+					case <-ctx.Done():
+					}
 					channel.Close()
 				case <-ctx.Done():
 					return
@@ -175,6 +205,7 @@ func TestConnectionTimeout(t *testing.T) {
 		err: errors.New("errorConn closed"),
 	}
 
+	origCreateClient := createClient
 	createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 		return &sshClient{
 			c:       &ssh.Client{Conn: conn},
@@ -184,8 +215,6 @@ func TestConnectionTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	InitializeSSHClientStore(time.Hour * 24 * 365)
 
 	client1, err := newSSHClient(ctx, "", "", "", "", nil)
 	expect(t, nil, err)
@@ -207,6 +236,8 @@ func TestConnectionTimeout(t *testing.T) {
 	if client1 == client2 {
 		t.Fatalf("Expected to get a new client, got the old one")
 	}
+
+	createClient = origCreateClient
 }
 
 type errorConn struct {
@@ -239,4 +270,59 @@ func (e *errorConn) Close() error { return nil }
 func (e *errorConn) Wait() error {
 	<-e.c
 	return e.err
+}
+
+func TestSlowServer(t *testing.T) {
+	config := &ssh.ServerConfig{
+		KeyboardInteractiveCallback: func(c ssh.ConnMetadata, client ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			return nil, nil
+		},
+	}
+
+	key, err := generateSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config.AddHostKey(key)
+
+	slowServer, err := newSSHTestServer(config, 5*time.Second)
+	if err != nil {
+		t.Fatal("failed to create slow server", err)
+	}
+	defer slowServer.cancel()
+	t.Log("slow server at", slowServer.listener.Addr())
+
+	fastServer, err := newSSHTestServer(config, 0)
+	if err != nil {
+		t.Fatal("failed to create fast server", err)
+	}
+	defer fastServer.cancel()
+	t.Log("fast server at", fastServer.listener.Addr())
+
+	responses := make(chan string)
+	slowStarted := make(chan struct{})
+	ctx := context.Background()
+
+	go func() {
+		slowStarted <- struct{}{}
+		slowClient, err := newSSHClient(ctx, slowServer.listener.Addr().String(), "user", "", "", map[string]string{"question": "answer"})
+		if err != nil {
+			t.Fatal("failed to create slow client", err)
+		}
+		defer slowClient.c.Close()
+		responses <- "slow"
+	}()
+
+	go func() {
+		<-slowStarted
+		fastClient, err := newSSHClient(ctx, fastServer.listener.Addr().String(), "user", "", "", map[string]string{"question": "answer"})
+		if err != nil {
+			t.Fatal("failed to create fast client", err)
+		}
+		defer fastClient.c.Close()
+		responses <- "fast"
+	}()
+
+	expect(t, "fast", <-responses)
 }
