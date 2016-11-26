@@ -65,6 +65,83 @@ func TestCreateClient(t *testing.T) {
 	expect(t, nil, err)
 }
 
+type testServer struct {
+	successfulConnections int32
+	listener              net.Listener
+	cancel                context.CancelFunc
+}
+
+func (s *testServer) Close() {
+	s.cancel()
+	s.listener.Close()
+}
+
+func newSSHTestServer(config *ssh.ServerConfig) (*testServer, error) {
+	s := &testServer{}
+	var ctx context.Context
+	ctx, s.cancel = context.WithCancel(context.Background())
+
+	s.listener = newLocalListener()
+
+	go func() {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			// log.Println("sshtest: error accepting connection", err)
+			return
+		}
+
+		_, chans, reqs, err := ssh.NewServerConn(conn, config)
+		if err != nil {
+			fmt.Println("error opening server conn", err)
+			return
+		}
+
+		go ssh.DiscardRequests(reqs)
+
+		go func() {
+			for {
+				select {
+				case newChannel, ok := <-chans:
+					if !ok {
+						fmt.Println("new connection channel close")
+						return
+					}
+					channel, _, err := newChannel.Accept()
+					if err != nil {
+						fmt.Println("error accepting new channel", err)
+					}
+
+					atomic.AddInt32(&s.successfulConnections, 1)
+					channel.Close()
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}()
+
+	return s, nil
+}
+
+func generateSSHKey() (ssh.Signer, error) {
+	pk, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.NewSignerFromSigner(pk)
+}
+
+// from net/http/httptest
+func newLocalListener() net.Listener {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+			panic(fmt.Sprintf("sstest: failed to listen on a port: %v", err))
+		}
+	}
+	return l
+}
+
 func TestKIHappyPath(t *testing.T) {
 	const (
 		user     = "user"
@@ -162,81 +239,4 @@ func (e *errorConn) Close() error { return nil }
 func (e *errorConn) Wait() error {
 	<-e.c
 	return e.err
-}
-
-type testServer struct {
-	successfulConnections int32
-	listener              net.Listener
-	cancel                context.CancelFunc
-}
-
-func (s *testServer) Close() {
-	s.cancel()
-	s.listener.Close()
-}
-
-func newSSHTestServer(config *ssh.ServerConfig) (*testServer, error) {
-	s := &testServer{}
-	var ctx context.Context
-	ctx, s.cancel = context.WithCancel(context.Background())
-
-	s.listener = newLocalListener()
-
-	go func() {
-		conn, err := s.listener.Accept()
-		if err != nil {
-			// log.Println("sshtest: error accepting connection", err)
-			return
-		}
-
-		_, chans, reqs, err := ssh.NewServerConn(conn, config)
-		if err != nil {
-			fmt.Println("error opening server conn", err)
-			return
-		}
-
-		go ssh.DiscardRequests(reqs)
-
-		go func() {
-			for {
-				select {
-				case newChannel, ok := <-chans:
-					if !ok {
-						fmt.Println("new connection channel close")
-						return
-					}
-					channel, _, err := newChannel.Accept()
-					if err != nil {
-						fmt.Println("error accepting new channel", err)
-					}
-
-					atomic.AddInt32(&s.successfulConnections, 1)
-					channel.Close()
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}()
-
-	return s, nil
-}
-
-func generateSSHKey() (ssh.Signer, error) {
-	pk, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	return ssh.NewSignerFromSigner(pk)
-}
-
-// from net/http/httptest
-func newLocalListener() net.Listener {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			panic(fmt.Sprintf("sstest: failed to listen on a port: %v", err))
-		}
-	}
-	return l
 }
