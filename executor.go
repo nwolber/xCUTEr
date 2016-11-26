@@ -198,7 +198,7 @@ func (e *executor) Add(j *jobInfo) error {
 			id: id,
 			j:  j,
 		}
-		log.Println(j.c.Name, "schedulued")
+		log.Println(j.c.Name, "scheduled")
 		e.addScheduled(s)
 	}
 
