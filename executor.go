@@ -77,13 +77,15 @@ func (info *runInfo) run() {
 		return
 	}
 
+	defer func() {
+		// release resources
+		cancel()
+		info.stop = time.Now()
+		info.e.removeRunning(info)
+		info.e.addComplete(info)
+	}()
 	info.start = time.Now()
 	info.j.f(ctx)
-	// release resources
-	cancel()
-	info.stop = time.Now()
-	info.e.removeRunning(info)
-	info.e.addComplete(info)
 }
 
 type executor struct {
