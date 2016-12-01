@@ -120,6 +120,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		elem, ok := store.clients[key]
 		if ok {
 			elem.ref--
+			elem.lastUsed = time.Now()
 		}
 	}(ctx, elem.client)
 
