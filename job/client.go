@@ -209,6 +209,7 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 	session, err := s.c.NewSession()
 	if err != nil {
 		l.Println("failed to create session:", err)
+		return err
 	}
 	defer session.Close()
 
