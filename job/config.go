@@ -107,7 +107,7 @@ func (o *output) MarshalJSON() ([]byte, error) {
 		return []byte(o.File), nil
 	}
 
-	var obj map[string]interface{}
+	obj := make(map[string]interface{})
 	obj["file"] = o.File
 	obj["raw"] = o.Raw
 	obj["overwrite"] = o.Overwrite

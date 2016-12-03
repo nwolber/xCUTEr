@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestAddOnce(t *testing.T) {
-	e := newExecutor(nil)
+	e := newExecutor(context.TODO())
 	done := make(chan struct{})
 	e.run = func(info *runInfo) {
 		if info == nil {

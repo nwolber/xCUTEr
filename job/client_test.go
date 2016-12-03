@@ -308,7 +308,8 @@ func TestSlowServer(t *testing.T) {
 		slowStarted <- struct{}{}
 		slowClient, err := newSSHClient(ctx, slowServer.listener.Addr().String(), "user", "", "", map[string]string{"question": "answer"})
 		if err != nil {
-			t.Fatal("failed to create slow client", err)
+			responses <- fmt.Sprint("failed to create slow client", err)
+			return
 		}
 		defer slowClient.c.Close()
 		responses <- "slow"
@@ -318,7 +319,8 @@ func TestSlowServer(t *testing.T) {
 		<-slowStarted
 		fastClient, err := newSSHClient(ctx, fastServer.listener.Addr().String(), "user", "", "", map[string]string{"question": "answer"})
 		if err != nil {
-			t.Fatal("failed to create fast client", err)
+			responses <- fmt.Sprint("failed to create fast client", err)
+			return
 		}
 		defer fastClient.c.Close()
 		responses <- "fast"

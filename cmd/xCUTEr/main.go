@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	_ "net/http/pprof"
 
@@ -26,7 +27,7 @@ func main() {
 	}
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, os.Kill)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 
 	x, err := xCUTEr.New(jobDir, sshTTL, file, logFile, once, quiet)
 	if err != nil {

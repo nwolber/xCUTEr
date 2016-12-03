@@ -260,10 +260,6 @@ func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
 }
 
 func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
-	if retries < 0 {
-		log.Fatalln("retries has to be greater than 0.")
-	}
-
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
