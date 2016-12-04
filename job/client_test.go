@@ -74,7 +74,10 @@ func TestCreateClient(t *testing.T) {
 }
 
 type testServer struct {
+	receivedConnection    chan struct{}
+	receivedRequest       chan struct{}
 	successfulConnections int32
+	successfulRequests    int32
 	listener              net.Listener
 	cancel                context.CancelFunc
 }
@@ -82,6 +85,8 @@ type testServer struct {
 func (s *testServer) Close() {
 	s.cancel()
 	s.listener.Close()
+	close(s.receivedRequest)
+	close(s.receivedConnection)
 }
 
 func newSSHTestServer(config *ssh.ServerConfig, sleepPeriod time.Duration) (*testServer, error) {
@@ -90,6 +95,8 @@ func newSSHTestServer(config *ssh.ServerConfig, sleepPeriod time.Duration) (*tes
 	ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.listener = newLocalListener()
+	s.receivedConnection = make(chan struct{})
+	s.receivedRequest = make(chan struct{})
 
 	go func() {
 		conn, err := s.listener.Accept()
@@ -115,7 +122,15 @@ func newSSHTestServer(config *ssh.ServerConfig, sleepPeriod time.Duration) (*tes
 		case <-ctx.Done():
 		}
 
-		go ssh.DiscardRequests(reqs)
+		go func(in <-chan *ssh.Request) {
+			for req := range in {
+				if req.WantReply {
+					req.Reply(false, nil)
+				}
+				atomic.AddInt32(&s.successfulRequests, 1)
+				s.receivedRequest <- struct{}{}
+			}
+		}(reqs)
 
 		go func() {
 			for {
@@ -143,6 +158,7 @@ func newSSHTestServer(config *ssh.ServerConfig, sleepPeriod time.Duration) (*tes
 					case <-ctx.Done():
 					}
 					channel.Close()
+					s.receivedConnection <- struct{}{}
 				case <-ctx.Done():
 					return
 				}
@@ -206,6 +222,10 @@ func TestConnectionTimeout(t *testing.T) {
 	}
 
 	origCreateClient := createClient
+	defer func() {
+		createClient = origCreateClient
+	}()
+
 	createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 		return &sshClient{
 			c:       &ssh.Client{Conn: conn},
@@ -236,8 +256,6 @@ func TestConnectionTimeout(t *testing.T) {
 	if client1 == client2 {
 		t.Fatalf("Expected to get a new client, got the old one")
 	}
-
-	createClient = origCreateClient
 }
 
 type errorConn struct {
@@ -327,4 +345,45 @@ func TestSlowServer(t *testing.T) {
 	}()
 
 	expect(t, "fast", <-responses)
+}
+
+func TestKeepalive(t *testing.T) {
+	origInterval := KeepaliveInterval
+	defer func() {
+		KeepaliveInterval = origInterval
+	}()
+
+	KeepaliveInterval = time.Millisecond
+
+	config := &ssh.ServerConfig{
+		KeyboardInteractiveCallback: func(c ssh.ConnMetadata, client ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			return nil, nil
+		},
+	}
+
+	key, err := generateSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config.AddHostKey(key)
+
+	server, err := newSSHTestServer(config, 0)
+	if err != nil {
+		t.Fatal("failed to create server", err)
+	}
+	defer server.cancel()
+	t.Log("server at", server.listener.Addr())
+
+	client, err := newSSHClient(context.TODO(), server.listener.Addr().String(), "user", "", "", map[string]string{"question": "answer"})
+	if err != nil {
+		t.Fatal("failed to create client", err)
+	}
+	defer client.c.Close()
+
+	select {
+	case <-server.receivedRequest:
+	case <-time.After(time.Second):
+		t.Fatal("grace period ran out, server didn't receive a keep-alive")
+	}
 }

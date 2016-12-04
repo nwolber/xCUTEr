@@ -28,12 +28,17 @@ type sshClientStore struct {
 	m       sync.Mutex
 }
 
-var (
-	errUnknownUser = errors.New("keyboard interactive: unknown user")
-)
+var ()
 
 var (
+	errUnknownUser = errors.New("keyboard interactive: unknown user")
+
 	store *sshClientStore
+
+	// KeepaliveInterval between two keep-alive messages.
+	// Changes to the time interval only apply to newly
+	// created connections.
+	KeepaliveInterval = time.Millisecond
 )
 
 // InitializeSSHClientStore initialies the global SSH connection store and
@@ -85,7 +90,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 
 		go func(client *sshClient) {
 			err := client.c.Wait()
-			log.Println("connection closed, removing from store:", err)
+			log.Println("connection to", key, "closed, removing from store:", err)
 
 			store.m.Lock()
 			defer store.m.Unlock()
@@ -106,21 +111,43 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		store.m.Lock()
 		defer store.m.Unlock()
 
-		log.Println("reusing existing connection")
+		log.Println("reusing existing connection to", key)
 	}
 
 	elem.ref++
 	elem.lastUsed = time.Now()
 
 	go func(ctx context.Context, client *sshClient) {
-		<-ctx.Done()
-		store.m.Lock()
-		defer store.m.Unlock()
+		defer func() {
+			store.m.Lock()
+			defer store.m.Unlock()
 
-		elem, ok := store.clients[key]
-		if ok {
-			elem.ref--
-			elem.lastUsed = time.Now()
+			elem, ok := store.clients[key]
+			if ok {
+				elem.ref--
+				elem.lastUsed = time.Now()
+				log.Println("context done, decrementing ref counter for", key, "new value:", elem.ref)
+			} else {
+				log.Println("context done, connection to", key, "doesn't exist anymore")
+			}
+		}()
+
+		keepaliveTimer := time.NewTimer(KeepaliveInterval)
+		defer keepaliveTimer.Stop()
+
+		for {
+			select {
+			case <-keepaliveTimer.C:
+				log.Println("sending keep-alive request to", key)
+				_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
+				if err != nil {
+					log.Println("keep-alive to", key, "failed:", err)
+					return
+				}
+				log.Println("keep-alive to", key, "successful")
+			case <-ctx.Done():
+				return
+			}
 		}
 	}(ctx, elem.client)
 
