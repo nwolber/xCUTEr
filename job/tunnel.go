@@ -81,30 +81,32 @@ func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) 
 
 			go func(conn net.Conn) {
 				defer conn.Close()
-				l.Println("accepted tunnel connection")
+				identity := fmt.Sprintf("%s->%s", conn.RemoteAddr(), conn.LocalAddr())
+
+				l.Println("accepted tunnel connection", identity)
 
 				localConn, err := d("tcp", addr)
 				if err != nil {
-					l.Println("unable to connect to endpoint", addr, err)
+					l.Println(identity, "unable to connect to endpoint", addr, err)
 					return
 				}
-				l.Println("connected to endpoint")
+				l.Println(identity, "connected to endpoint")
 
-				go copyConn(localConn, conn)
-				copyConn(conn, localConn)
-				l.Println("tunnel connection closed")
+				go copyConn(identity, localConn, conn)
+				copyConn(identity, conn, localConn)
+				l.Println(identity, "tunnel connection closed")
 			}(remoteConn)
 
 		case <-ctx.Done():
-			l.Println("closing tunnel")
+			l.Println("context done, closing tunnel on", listener.Addr())
 			return
 		}
 	}
 }
 
-func copyConn(writer io.Writer, reader io.Reader) {
+func copyConn(identity string, writer io.Writer, reader io.Reader) {
 	_, err := io.Copy(writer, reader)
 	if err != nil {
-		log.Println("io.Copy error:", err)
+		log.Println(identity, "io.Copy error:", err)
 	}
 }
