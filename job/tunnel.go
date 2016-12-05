@@ -90,11 +90,11 @@ func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) 
 					l.Println(identity, "unable to connect to endpoint", addr, err)
 					return
 				}
-				l.Println(identity, "connected to endpoint")
+				l.Println(identity, "connected to endpoint", addr)
 
 				go copyConn(identity, localConn, conn)
 				copyConn(identity, conn, localConn)
-				l.Println(identity, "tunnel connection closed")
+				l.Println(identity, "tunnel connection closed to", addr)
 			}(remoteConn)
 
 		case <-ctx.Done():
