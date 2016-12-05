@@ -306,13 +306,13 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 			return nil, err
 		}
 
-		l.Println("connecting to ", host)
+		l.Println("connecting to", host)
 		s, err := newSSHClient(ctx, host, user, keyFile, password, keyboardInteractive)
 		if err != nil {
 			l.Println("ssh client setup failed", err)
 			return nil, err
 		}
-		l.Println("connected to ", host)
+		l.Println("connected to", host)
 
 		return context.WithValue(ctx, sshClientKey, s), nil
 	})

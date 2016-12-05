@@ -38,7 +38,7 @@ var (
 	// KeepaliveInterval between two keep-alive messages.
 	// Changes to the time interval only apply to newly
 	// created connections.
-	KeepaliveInterval = time.Millisecond
+	KeepaliveInterval = 30 * time.Second
 )
 
 // InitializeSSHClientStore initialies the global SSH connection store and
@@ -71,6 +71,16 @@ func InitializeSSHClientStore(ttl time.Duration) {
 	}()
 }
 
+func waitConn(client *ssh.Client) chan error {
+	c := make(chan error)
+	go func(client *ssh.Client, c chan error) {
+		c <- client.Wait()
+		close(c)
+	}(client, c)
+
+	return c
+}
+
 func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)
 
@@ -89,8 +99,30 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		}
 
 		go func(client *sshClient) {
-			err := client.c.Wait()
-			log.Println("connection to", key, "closed, removing from store:", err)
+			connClosed := waitConn(client.c)
+			keepaliveTimer := time.NewTimer(KeepaliveInterval)
+			defer keepaliveTimer.Stop()
+
+		loop:
+			for {
+				select {
+				case <-keepaliveTimer.C:
+					log.Println("sending keep-alive request to", key)
+					_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
+					if err != nil {
+						log.Println("keep-alive to", key, "failed:", err)
+						continue
+					}
+					log.Println("keep-alive to", key, "successful")
+				case err := <-connClosed:
+					if err != nil {
+						log.Println("connection to", key, "closed, removing from store:", err)
+					} else {
+						log.Println("conntection to", key, "closed without error, removing from store")
+					}
+					break loop
+				}
+			}
 
 			store.m.Lock()
 			defer store.m.Unlock()
@@ -116,38 +148,20 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 
 	elem.ref++
 	elem.lastUsed = time.Now()
+	log.Println("incrementing ref counter for", key, "new value:", elem.ref)
 
 	go func(ctx context.Context, client *sshClient) {
-		defer func() {
-			store.m.Lock()
-			defer store.m.Unlock()
+		<-ctx.Done()
+		store.m.Lock()
+		defer store.m.Unlock()
 
-			elem, ok := store.clients[key]
-			if ok {
-				elem.ref--
-				elem.lastUsed = time.Now()
-				log.Println("context done, decrementing ref counter for", key, "new value:", elem.ref)
-			} else {
-				log.Println("context done, connection to", key, "doesn't exist anymore")
-			}
-		}()
-
-		keepaliveTimer := time.NewTimer(KeepaliveInterval)
-		defer keepaliveTimer.Stop()
-
-		for {
-			select {
-			case <-keepaliveTimer.C:
-				log.Println("sending keep-alive request to", key)
-				_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
-				if err != nil {
-					log.Println("keep-alive to", key, "failed:", err)
-					return
-				}
-				log.Println("keep-alive to", key, "successful")
-			case <-ctx.Done():
-				return
-			}
+		elem, ok := store.clients[key]
+		if ok {
+			elem.ref--
+			elem.lastUsed = time.Now()
+			log.Println("context done, decrementing ref counter for", key, "new value:", elem.ref)
+		} else {
+			log.Println("context done, connection to", key, "doesn't exist anymore")
 		}
 	}(ctx, elem.client)
 
