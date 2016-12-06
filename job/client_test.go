@@ -386,4 +386,10 @@ func TestKeepalive(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("grace period ran out, server didn't receive a keep-alive")
 	}
+
+	select {
+	case <-server.receivedRequest:
+	case <-time.After(time.Second):
+		t.Fatal("grace period ran out, server didn't receive a keep-alive")
+	}
 }

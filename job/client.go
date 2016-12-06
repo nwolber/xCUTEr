@@ -100,7 +100,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 
 		go func(client *sshClient) {
 			connClosed := waitConn(client.c)
-			keepaliveTimer := time.NewTimer(KeepaliveInterval)
+			keepaliveTimer := time.NewTicker(KeepaliveInterval)
 			defer keepaliveTimer.Stop()
 
 		loop:
