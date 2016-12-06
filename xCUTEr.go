@@ -32,7 +32,7 @@ const (
 )
 
 // New creates a new xCUTEr with the given config options.
-func New(jobDir string, sshTTL time.Duration, file, logFile string, once, quiet bool) (*XCUTEr, error) {
+func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string, once, quiet bool) (*XCUTEr, error) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
 	if logFile != "" && !quiet {
@@ -53,6 +53,7 @@ func New(jobDir string, sshTTL time.Duration, file, logFile string, once, quiet 
 	}
 
 	job.InitializeSSHClientStore(sshTTL)
+	job.KeepAliveInterval = sshKeepAlive
 
 	e := newExecutor(mainCtx)
 	e.Start()

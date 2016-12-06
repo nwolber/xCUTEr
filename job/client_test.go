@@ -348,12 +348,12 @@ func TestSlowServer(t *testing.T) {
 }
 
 func TestKeepalive(t *testing.T) {
-	origInterval := KeepaliveInterval
+	origInterval := KeepAliveInterval
 	defer func() {
-		KeepaliveInterval = origInterval
+		KeepAliveInterval = origInterval
 	}()
 
-	KeepaliveInterval = time.Millisecond
+	KeepAliveInterval = time.Millisecond
 
 	config := &ssh.ServerConfig{
 		KeyboardInteractiveCallback: func(c ssh.ConnMetadata, client ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {

@@ -28,17 +28,15 @@ type sshClientStore struct {
 	m       sync.Mutex
 }
 
-var ()
-
 var (
 	errUnknownUser = errors.New("keyboard interactive: unknown user")
 
 	store *sshClientStore
 
-	// KeepaliveInterval between two keep-alive messages.
+	// KeepAliveInterval between two keep-alive messages.
 	// Changes to the time interval only apply to newly
 	// created connections.
-	KeepaliveInterval = 30 * time.Second
+	KeepAliveInterval = 30 * time.Second
 )
 
 // InitializeSSHClientStore initialies the global SSH connection store and
@@ -100,13 +98,13 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 
 		go func(client *sshClient) {
 			connClosed := waitConn(client.c)
-			keepaliveTimer := time.NewTicker(KeepaliveInterval)
-			defer keepaliveTimer.Stop()
+			keepAliveTimer := time.NewTicker(KeepAliveInterval)
+			defer keepAliveTimer.Stop()
 
 		loop:
 			for {
 				select {
-				case <-keepaliveTimer.C:
+				case <-keepAliveTimer.C:
 					log.Println("sending keep-alive request to", key)
 					_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
 					if err != nil {

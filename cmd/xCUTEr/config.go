@@ -11,19 +11,21 @@ import (
 	"time"
 )
 
-func config() (jobDir string, sshTTL time.Duration, file, logFile, perf string, once, quiet bool) {
+func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, perf string, once, quiet bool) {
 	const (
-		jobDirDefault  = "."
-		sshTTLDefault  = time.Minute * 10
-		logFileDefault = ""
-		defaultPerf    = ""
-		fileDefault    = ""
-		onceDefault    = false
-		quietDefault   = false
+		jobDirDefault       = "."
+		sshTTLDefault       = time.Minute * 10
+		sshKeepAliveDefault = time.Second * 30
+		logFileDefault      = ""
+		defaultPerf         = ""
+		fileDefault         = ""
+		onceDefault         = false
+		quietDefault        = false
 	)
 
-	flag.StringVar(&jobDir, "jobs", jobDirDefault, "Directory to watch for .job files")
-	flag.DurationVar(&sshTTL, "sshTTL", sshTTLDefault, "Time until an unused SSH connection is closed")
+	flag.StringVar(&jobDir, "jobs", jobDirDefault, "Directory to watch for .job files.")
+	flag.DurationVar(&sshTTL, "sshTTL", sshTTLDefault, "Time until an unused SSH connection is closed.")
+	flag.DurationVar(&sshKeepAlive, "sshKeepAlive", sshKeepAliveDefault, "Time between SSH keep-alive requests.")
 	flag.StringVar(&file, "file", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
 	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turning off log messages. Command output is still printed. Overwrites -log.")

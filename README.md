@@ -15,6 +15,7 @@ Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS 
 
 * `-jobs` Directory to watch for .job files.
 * `-sshTTL` Time until an unused SSH connection is closed.
+* `-sshKeepAlive` Time between SSH keep-alive requests.
 * `-file` Job file to execute.
 Takes presedence over `-jobs`.
 * `-once` Run the job given by `-file` only once, regardless of the [schedule](#schedule) directive.
