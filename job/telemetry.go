@@ -486,7 +486,7 @@ func (g *nodeGroup) String(v *vars) string {
 type telemetryBuilder struct {
 	u    chan NodeEvent
 	str  *stringVisitor
-	exec executionTreeVisitor
+	exec ExecutionTreeVisitor
 }
 
 func newTelemtryBuilder() *telemetryBuilder {

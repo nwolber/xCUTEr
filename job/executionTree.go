@@ -22,7 +22,7 @@ import (
 // ExecutionTree creates the execution tree necessary to executeCommand
 // the configured steps.
 func (c *Config) ExecutionTree() (flunc.Flunc, error) {
-	f, err := visitConfig(&executionTreeVisitor{}, c)
+	f, err := visitConfig(&ExecutionTreeVisitor{}, c)
 	if err != nil {
 		return nil, err
 	}
@@ -54,21 +54,22 @@ func (g *executionGroup) Wrap() interface{} {
 	return g.group(g.fluncs...)
 }
 
-type executionTreeVisitor struct{}
+// ExecutionTreeVisitor creates subtrees of an execution tree.
+type ExecutionTreeVisitor struct{}
 
-func (e *executionTreeVisitor) Sequential() Group {
+func (e *ExecutionTreeVisitor) Sequential() Group {
 	return &executionGroup{group: flunc.Sequential}
 }
 
-func (e *executionTreeVisitor) Parallel() Group {
+func (e *ExecutionTreeVisitor) Parallel() Group {
 	return &executionGroup{group: flunc.Parallel}
 }
 
-func (e *executionTreeVisitor) Job(name string) Group {
+func (e *ExecutionTreeVisitor) Job(name string) Group {
 	return e.Sequential()
 }
 
-func (*executionTreeVisitor) Output(o *Output) interface{} {
+func (*ExecutionTreeVisitor) Output(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
@@ -137,7 +138,7 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 	return f, nil
 }
 
-func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
+func (e *ExecutionTreeVisitor) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -150,7 +151,7 @@ func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
+func (e *ExecutionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -170,7 +171,7 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
+func (e *ExecutionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -187,7 +188,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) SCP(scp *ScpData) interface{} {
+func (e *ExecutionTreeVisitor) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -209,15 +210,15 @@ func (e *executionTreeVisitor) SCP(scp *ScpData) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Hosts() Group {
+func (e *ExecutionTreeVisitor) Hosts() Group {
 	return e.Parallel()
 }
 
-func (e *executionTreeVisitor) Host(c *Config, h *Host) Group {
+func (e *ExecutionTreeVisitor) Host(c *Config, h *Host) Group {
 	return e.Sequential()
 }
 
-func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
+func (e *ExecutionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -240,7 +241,7 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
+func (e *ExecutionTreeVisitor) ContextBounds(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -255,7 +256,7 @@ func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
+func (e *ExecutionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -286,14 +287,14 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 	})
 }
 
-func (e *executionTreeVisitor) Templating(c *Config, h *Host) interface{} {
+func (e *ExecutionTreeVisitor) Templating(c *Config, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
 		return context.WithValue(ctx, templatingKey, tt), nil
 	})
 }
 
-func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
+func (*ExecutionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -314,7 +315,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 	})
 }
 
-func (*executionTreeVisitor) Forwarding(f *Forwarding) interface{} {
+func (*ExecutionTreeVisitor) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -337,7 +338,7 @@ func (*executionTreeVisitor) Forwarding(f *Forwarding) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) Tunnel(f *Forwarding) interface{} {
+func (*ExecutionTreeVisitor) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -360,11 +361,11 @@ func (*executionTreeVisitor) Tunnel(f *Forwarding) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Commands(cmd *Command) Group {
+func (e *ExecutionTreeVisitor) Commands(cmd *Command) Group {
 	return e.Sequential()
 }
 
-func (*executionTreeVisitor) Command(cmd *Command) interface{} {
+func (*ExecutionTreeVisitor) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -406,7 +407,7 @@ func (*executionTreeVisitor) Command(cmd *Command) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) LocalCommand(cmd *Command) interface{} {
+func (*ExecutionTreeVisitor) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -464,7 +465,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *Command) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Stdout(o *Output) interface{} {
+func (e *ExecutionTreeVisitor) Stdout(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
@@ -507,7 +508,7 @@ func (e *executionTreeVisitor) Stdout(o *Output) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) Stderr(o *Output) interface{} {
+func (*ExecutionTreeVisitor) Stderr(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
