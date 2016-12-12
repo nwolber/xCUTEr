@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type templatingEngine struct {
+type TemplatingEngine struct {
 	Config *Config
 	Host   *Host
 	Env    map[string]string
@@ -31,8 +31,8 @@ func getEnv() map[string]string {
 	return env
 }
 
-func newTemplatingEngine(c *Config, h *Host) *templatingEngine {
-	return &templatingEngine{
+func newTemplatingEngine(c *Config, h *Host) *TemplatingEngine {
+	return &TemplatingEngine{
 		Config: c,
 		Host:   h,
 		Env:    getEnv(),
@@ -40,7 +40,7 @@ func newTemplatingEngine(c *Config, h *Host) *templatingEngine {
 	}
 }
 
-func (t *templatingEngine) Interpolate(templ string) (string, error) {
+func (t *TemplatingEngine) Interpolate(templ string) (string, error) {
 	var buf bytes.Buffer
 
 	funcMap := template.FuncMap{

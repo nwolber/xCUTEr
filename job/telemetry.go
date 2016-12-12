@@ -128,7 +128,7 @@ type node interface {
 	Status(status NodeStatus, text string)
 	Exec() flunc.Flunc
 	Log(t time.Time, file string, line int, message string)
-	stringer
+	Stringer
 }
 
 // A LogMessage .
@@ -141,11 +141,11 @@ type LogMessage struct {
 type simpleNode struct {
 	typ    string
 	exec   flunc.Flunc
-	str    stringer
+	str    Stringer
 	status NodeStatus
 	text   string
 	log    []*LogMessage
-	v      *vars
+	v      *Vars
 }
 
 func (n *simpleNode) Typ() string {
@@ -206,7 +206,7 @@ func formatString(str string, status NodeStatus, text string) string {
 	return str
 }
 
-func (n *simpleNode) String(v *vars) string {
+func (n *simpleNode) String(v *Vars) string {
 	str := ""
 	if n.v != nil {
 		str = n.str.String(n.v)
@@ -375,13 +375,13 @@ func (ctx *interceptContext) Value(key interface{}) interface{}       { return c
 
 func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) flunc.Flunc {
 	return flunc.MakeFlunc(func(origCtx context.Context) (context.Context, error) {
-		tt, _ := origCtx.Value(templatingKey).(*templatingEngine)
+		tt, _ := origCtx.Value(templatingKey).(*TemplatingEngine)
 		if tt != nil {
 			switch nn := n.(type) {
 			case *simpleNode:
-				nn.v = &vars{tt: tt}
+				nn.v = &Vars{tt: tt}
 			case *nodeGroup:
-				nn.v = &vars{tt: tt}
+				nn.v = &Vars{tt: tt}
 			}
 		}
 
@@ -423,7 +423,7 @@ func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) 
 
 type stringerGroup interface {
 	Group
-	stringer
+	Stringer
 }
 
 type nodeGroup struct {
@@ -434,7 +434,7 @@ type nodeGroup struct {
 	exec     *executionGroup
 	str      stringerGroup
 	update   func(NodeStatus, string, string)
-	v        *vars
+	v        *Vars
 }
 
 func (g *nodeGroup) Append(children ...interface{}) {
@@ -449,7 +449,7 @@ func (g *nodeGroup) Append(children ...interface{}) {
 		}
 
 		g.exec.Append(n.Exec())
-		g.str.Append(n.(stringer))
+		g.str.Append(n.(Stringer))
 		g.children = append(g.children, n)
 	}
 }
@@ -479,21 +479,21 @@ func (g *nodeGroup) Exec() flunc.Flunc {
 	return instrument(g.update, g, g.exec.Wrap().(flunc.Flunc))
 }
 
-func (g *nodeGroup) String(v *vars) string {
+func (g *nodeGroup) String(v *Vars) string {
 	return formatString(g.str.String(g.v), g.status, g.text)
 }
 
 type telemetryBuilder struct {
 	u    chan NodeEvent
-	str  *stringVisitor
-	exec ExecutionTreeVisitor
+	str  *StringBuilder
+	exec ExecutionTreeBuilder
 }
 
 func newTelemtryBuilder() *telemetryBuilder {
 	return &telemetryBuilder{
 		u: make(chan NodeEvent),
-		str: &stringVisitor{
-			full: true,
+		str: &StringBuilder{
+			Full: true,
 		},
 	}
 }
@@ -542,7 +542,7 @@ func (t *telemetryBuilder) Output(o *Output) interface{} {
 
 	var n simpleNode
 	n.typ = "Output"
-	n.str = t.str.Output(o).(stringer)
+	n.str = t.str.Output(o).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Output(o).(flunc.Flunc))
 	return &n
 }
@@ -550,7 +550,7 @@ func (t *telemetryBuilder) Output(o *Output) interface{} {
 func (t *telemetryBuilder) JobLogger(jobName string) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Job %s", jobName)
-	n.str = t.str.JobLogger(jobName).(stringer)
+	n.str = t.str.JobLogger(jobName).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.JobLogger(jobName).(flunc.Flunc))
 	return &n
 }
@@ -558,7 +558,7 @@ func (t *telemetryBuilder) JobLogger(jobName string) interface{} {
 func (t *telemetryBuilder) HostLogger(jobName string, h *Host) interface{} {
 	var n simpleNode
 	n.typ = "Host logger"
-	n.str = t.str.HostLogger(jobName, h).(stringer)
+	n.str = t.str.HostLogger(jobName, h).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.HostLogger(jobName, h).(flunc.Flunc))
 	return &n
 }
@@ -566,7 +566,7 @@ func (t *telemetryBuilder) HostLogger(jobName string, h *Host) interface{} {
 func (t *telemetryBuilder) Timeout(timeout time.Duration) interface{} {
 	var n simpleNode
 	n.typ = "Timeout"
-	n.str = t.str.Timeout(timeout).(stringer)
+	n.str = t.str.Timeout(timeout).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Timeout(timeout).(flunc.Flunc))
 	return &n
 }
@@ -574,7 +574,7 @@ func (t *telemetryBuilder) Timeout(timeout time.Duration) interface{} {
 func (t *telemetryBuilder) SCP(scp *ScpData) interface{} {
 	var n simpleNode
 	n.typ = "SCP"
-	n.str = t.str.SCP(scp).(stringer)
+	n.str = t.str.SCP(scp).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.SCP(scp).(flunc.Flunc))
 	return &n
 }
@@ -601,7 +601,7 @@ func (t *telemetryBuilder) Host(c *Config, h *Host) Group {
 func (t *telemetryBuilder) ErrorSafeguard(child interface{}) interface{} {
 	var n simpleNode
 	n.typ = "Error Safeguard"
-	n.str = t.str.ErrorSafeguard(child).(stringer)
+	n.str = t.str.ErrorSafeguard(child).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.ErrorSafeguard(child.(node).Exec()).(flunc.Flunc))
 	return &n
 }
@@ -609,7 +609,7 @@ func (t *telemetryBuilder) ErrorSafeguard(child interface{}) interface{} {
 func (t *telemetryBuilder) ContextBounds(child interface{}) interface{} {
 	var n simpleNode
 	n.typ = "Context Bounds"
-	n.str = t.str.ContextBounds(child).(stringer)
+	n.str = t.str.ContextBounds(child).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.ContextBounds(child.(node).Exec()).(flunc.Flunc))
 	return &n
 }
@@ -617,7 +617,7 @@ func (t *telemetryBuilder) ContextBounds(child interface{}) interface{} {
 func (t *telemetryBuilder) Retry(child interface{}, retries uint) interface{} {
 	var n simpleNode
 	n.typ = "Retry"
-	n.str = t.str.Retry(child, retries).(stringer)
+	n.str = t.str.Retry(child, retries).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Retry(child.(node).Exec(), retries).(flunc.Flunc))
 	return &n
 }
@@ -625,7 +625,7 @@ func (t *telemetryBuilder) Retry(child interface{}, retries uint) interface{} {
 func (t *telemetryBuilder) Templating(c *Config, h *Host) interface{} {
 	var n simpleNode
 	n.typ = "Templating"
-	n.str = t.str.Templating(c, h).(stringer)
+	n.str = t.str.Templating(c, h).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Templating(c, h).(flunc.Flunc))
 
 	return &n
@@ -634,7 +634,7 @@ func (t *telemetryBuilder) Templating(c *Config, h *Host) interface{} {
 func (t *telemetryBuilder) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("SSH client %s@%s", user, host)
-	n.str = t.str.SSHClient(host, user, keyFile, password, keyboardInteractive).(stringer)
+	n.str = t.str.SSHClient(host, user, keyFile, password, keyboardInteractive).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.SSHClient(host, user, keyFile, password, keyboardInteractive).(flunc.Flunc))
 	return &n
 }
@@ -642,7 +642,7 @@ func (t *telemetryBuilder) SSHClient(host, user, keyFile, password string, keybo
 func (t *telemetryBuilder) Forwarding(f *Forwarding) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort)
-	n.str = t.str.Forwarding(f).(stringer)
+	n.str = t.str.Forwarding(f).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Forwarding(f).(flunc.Flunc))
 	return &n
 }
@@ -650,7 +650,7 @@ func (t *telemetryBuilder) Forwarding(f *Forwarding) interface{} {
 func (t *telemetryBuilder) Tunnel(f *Forwarding) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort)
-	n.str = t.str.Tunnel(f).(stringer)
+	n.str = t.str.Tunnel(f).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Tunnel(f).(flunc.Flunc))
 	return &n
 }
@@ -667,7 +667,7 @@ func (t *telemetryBuilder) Commands(cmd *Command) Group {
 func (t *telemetryBuilder) Command(cmd *Command) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Command %q", cmd.Command)
-	n.str = t.str.Command(cmd).(stringer)
+	n.str = t.str.Command(cmd).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Command(cmd).(flunc.Flunc))
 	return &n
 }
@@ -675,7 +675,7 @@ func (t *telemetryBuilder) Command(cmd *Command) interface{} {
 func (t *telemetryBuilder) LocalCommand(cmd *Command) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Local Command %q", cmd.Command)
-	n.str = t.str.LocalCommand(cmd).(stringer)
+	n.str = t.str.LocalCommand(cmd).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.LocalCommand(cmd).(flunc.Flunc))
 	return &n
 }
@@ -683,7 +683,7 @@ func (t *telemetryBuilder) LocalCommand(cmd *Command) interface{} {
 func (t *telemetryBuilder) Stdout(o *Output) interface{} {
 	var n simpleNode
 	n.typ = "Stdout"
-	n.str = t.str.Stdout(o).(stringer)
+	n.str = t.str.Stdout(o).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Stdout(o).(flunc.Flunc))
 	return &n
 }
@@ -691,7 +691,7 @@ func (t *telemetryBuilder) Stdout(o *Output) interface{} {
 func (t *telemetryBuilder) Stderr(o *Output) interface{} {
 	var n simpleNode
 	n.typ = "Stderr"
-	n.str = t.str.Stderr(o).(stringer)
+	n.str = t.str.Stderr(o).(Stringer)
 	n.exec = instrument(t.update, &n, t.exec.Stderr(o).(flunc.Flunc))
 	return &n
 }

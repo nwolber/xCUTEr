@@ -11,22 +11,22 @@ import (
 	"time"
 )
 
-type stringVisitor struct {
-	full, raw             bool
-	maxHosts, maxCommands int
+type StringBuilder struct {
+	Full, Raw             bool
+	MaxHosts, MaxCommands int
 }
 
-type vars struct {
-	tt *templatingEngine
+type Vars struct {
+	tt *TemplatingEngine
 }
 
-type stringer interface {
-	String(v *vars) string
+type Stringer interface {
+	String(v *Vars) string
 }
 
 type simple string
 
-func (s simple) String(v *vars) string {
+func (s simple) String(v *Vars) string {
 	str := string(s)
 	if v != nil && v.tt != nil {
 		newStr, err := v.tt.Interpolate(str)
@@ -42,7 +42,7 @@ func (s simple) String(v *vars) string {
 
 type multiple struct {
 	typ       string
-	stringers []stringer
+	stringers []Stringer
 	max       int
 	raw       bool
 }
@@ -53,7 +53,7 @@ func (s *multiple) Append(children ...interface{}) {
 			continue
 		}
 
-		f, ok := cc.(stringer)
+		f, ok := cc.(Stringer)
 		if !ok {
 			log.Panicf("not a Stringer %T", cc)
 		}
@@ -66,7 +66,7 @@ func (s *multiple) Wrap() interface{} {
 	return s
 }
 
-func (s *multiple) String(v *vars) string {
+func (s *multiple) String(v *Vars) string {
 	str := s.typ
 	l := len(s.stringers)
 
@@ -75,7 +75,7 @@ func (s *multiple) String(v *vars) string {
 	}
 
 	if s.raw {
-		v = &vars{}
+		v = &Vars{}
 	}
 
 	str += "\n"
@@ -104,26 +104,26 @@ func (s *multiple) String(v *vars) string {
 	return str
 }
 
-func (*stringVisitor) Sequential() Group {
+func (*StringBuilder) Sequential() Group {
 	return &multiple{
 		typ: "Sequential",
 	}
 }
 
-func (*stringVisitor) Parallel() Group {
+func (*StringBuilder) Parallel() Group {
 	return &multiple{
 		typ: "Parallel",
 	}
 }
 
-func (s *stringVisitor) Job(name string) Group {
+func (s *StringBuilder) Job(name string) Group {
 	return &multiple{
 		typ: name,
-		raw: s.raw,
+		raw: s.Raw,
 	}
 }
 
-func (s *stringVisitor) Output(o *Output) interface{} {
+func (s *StringBuilder) Output(o *Output) interface{} {
 	if o == nil {
 		return nil
 	}
@@ -131,32 +131,32 @@ func (s *stringVisitor) Output(o *Output) interface{} {
 	return simple(fmt.Sprintf("Output: %s", o))
 }
 
-func (s *stringVisitor) JobLogger(jobName string) interface{} {
-	if s.full {
+func (s *StringBuilder) JobLogger(jobName string) interface{} {
+	if s.Full {
 		return simple("Create job logger")
 	}
 	return nil
 }
 
-func (s *stringVisitor) HostLogger(jobName string, h *Host) interface{} {
-	if s.full {
+func (s *StringBuilder) HostLogger(jobName string, h *Host) interface{} {
+	if s.Full {
 		return simple("Create host logger")
 	}
 	return nil
 }
 
-func (*stringVisitor) Timeout(timeout time.Duration) interface{} {
+func (*StringBuilder) Timeout(timeout time.Duration) interface{} {
 	return simple(fmt.Sprint("Timeout: ", timeout))
 }
 
-func (*stringVisitor) SCP(scp *ScpData) interface{} {
+func (*StringBuilder) SCP(scp *ScpData) interface{} {
 	return simple(fmt.Sprintf("SCP listen on %s:%d", scp.Addr, scp.Port))
 }
 
-func (s *stringVisitor) Hosts() Group {
+func (s *StringBuilder) Hosts() Group {
 	return &multiple{
 		typ: "Target hosts",
-		max: s.maxHosts,
+		max: s.MaxHosts,
 	}
 }
 
@@ -173,11 +173,11 @@ func (p *partHost) Wrap() interface{} {
 	return p
 }
 
-func (p *partHost) String(v *vars) string {
-	vr := &vars{}
+func (p *partHost) String(v *Vars) string {
+	vr := &Vars{}
 
 	if v != nil && v.tt != nil {
-		vr.tt = &templatingEngine{
+		vr.tt = &TemplatingEngine{
 			Config: v.tt.Config,
 			Host:   p.h,
 			now:    v.tt.now,
@@ -187,7 +187,7 @@ func (p *partHost) String(v *vars) string {
 	return p.multiple.String(vr)
 }
 
-func (s *stringVisitor) Host(c *Config, h *Host) Group {
+func (s *StringBuilder) Host(c *Config, h *Host) Group {
 	var name string
 
 	if h.Name != "" {
@@ -206,16 +206,16 @@ func (s *stringVisitor) Host(c *Config, h *Host) Group {
 	return p
 }
 
-func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
-	str, ok := child.(stringer)
+func (s *StringBuilder) ErrorSafeguard(child interface{}) interface{} {
+	str, ok := child.(Stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
 
-	if s.full {
+	if s.Full {
 		return &multiple{
 			typ: "Error safeguard",
-			stringers: []stringer{
+			stringers: []Stringer{
 				str,
 			},
 		}
@@ -223,16 +223,16 @@ func (s *stringVisitor) ErrorSafeguard(child interface{}) interface{} {
 	return child
 }
 
-func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
-	str, ok := child.(stringer)
+func (s *StringBuilder) ContextBounds(child interface{}) interface{} {
+	str, ok := child.(Stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
 
-	if s.full {
+	if s.Full {
 		return &multiple{
 			typ: "Context Bounds",
-			stringers: []stringer{
+			stringers: []Stringer{
 				str,
 			},
 		}
@@ -240,47 +240,47 @@ func (s *stringVisitor) ContextBounds(child interface{}) interface{} {
 	return child
 }
 
-func (s *stringVisitor) Retry(child interface{}, retries uint) interface{} {
-	str, ok := child.(stringer)
+func (s *StringBuilder) Retry(child interface{}, retries uint) interface{} {
+	str, ok := child.(Stringer)
 	if !ok {
 		log.Panicf("not a Stringer %T", child)
 	}
 
 	return &multiple{
 		typ: fmt.Sprintf("Retry up to %d times", retries),
-		stringers: []stringer{
+		stringers: []Stringer{
 			str,
 		},
 	}
 }
 
-func (s *stringVisitor) Templating(c *Config, h *Host) interface{} {
-	if s.full {
+func (s *StringBuilder) Templating(c *Config, h *Host) interface{} {
+	if s.Full {
 		return simple("Create templating engine")
 	}
 	return nil
 }
 
-func (*stringVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
+func (*StringBuilder) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return simple(fmt.Sprintf("Open SSH connection to %s@%s", user, host))
 }
 
-func (*stringVisitor) Forwarding(f *Forwarding) interface{} {
+func (*StringBuilder) Forwarding(f *Forwarding) interface{} {
 	return simple(fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort))
 }
 
-func (*stringVisitor) Tunnel(f *Forwarding) interface{} {
+func (*StringBuilder) Tunnel(f *Forwarding) interface{} {
 	return simple(fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort))
 }
 
-func (s *stringVisitor) Commands(cmd *Command) Group {
+func (s *StringBuilder) Commands(cmd *Command) Group {
 	return &multiple{
 		typ: "Command",
-		max: s.maxCommands,
+		max: s.MaxCommands,
 	}
 }
 
-func (s *stringVisitor) Command(cmd *Command) interface{} {
+func (s *StringBuilder) Command(cmd *Command) interface{} {
 	var str string
 	if cmd.Command != "" {
 		str = fmt.Sprintf("Execute %q", cmd.Command)
@@ -291,7 +291,7 @@ func (s *stringVisitor) Command(cmd *Command) interface{} {
 	return simple(str)
 }
 
-func (s *stringVisitor) LocalCommand(cmd *Command) interface{} {
+func (s *StringBuilder) LocalCommand(cmd *Command) interface{} {
 	var str string
 	if cmd.Command != "" {
 		str = fmt.Sprintf("Execute %q locally", cmd.Command)
@@ -302,7 +302,7 @@ func (s *stringVisitor) LocalCommand(cmd *Command) interface{} {
 	return simple(str)
 }
 
-func (s *stringVisitor) Stdout(o *Output) interface{} {
+func (s *StringBuilder) Stdout(o *Output) interface{} {
 	if o.File == "null" {
 		return simple("Discard any output from STDOUT")
 	}
@@ -310,7 +310,7 @@ func (s *stringVisitor) Stdout(o *Output) interface{} {
 	return simple(fmt.Sprintf("Redirect STDOUT to %s", o))
 }
 
-func (s *stringVisitor) Stderr(o *Output) interface{} {
+func (s *StringBuilder) Stderr(o *Output) interface{} {
 	if o.File == "null" {
 		return simple("Discard any output from STDERR")
 	}

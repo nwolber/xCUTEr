@@ -22,7 +22,7 @@ import (
 // ExecutionTree creates the execution tree necessary to executeCommand
 // the configured steps.
 func (c *Config) ExecutionTree() (flunc.Flunc, error) {
-	f, err := visitConfig(&ExecutionTreeVisitor{}, c)
+	f, err := visitConfig(&ExecutionTreeBuilder{}, c)
 	if err != nil {
 		return nil, err
 	}
@@ -55,21 +55,21 @@ func (g *executionGroup) Wrap() interface{} {
 }
 
 // ExecutionTreeVisitor creates subtrees of an execution tree.
-type ExecutionTreeVisitor struct{}
+type ExecutionTreeBuilder struct{}
 
-func (e *ExecutionTreeVisitor) Sequential() Group {
+func (e *ExecutionTreeBuilder) Sequential() Group {
 	return &executionGroup{group: flunc.Sequential}
 }
 
-func (e *ExecutionTreeVisitor) Parallel() Group {
+func (e *ExecutionTreeBuilder) Parallel() Group {
 	return &executionGroup{group: flunc.Parallel}
 }
 
-func (e *ExecutionTreeVisitor) Job(name string) Group {
+func (e *ExecutionTreeBuilder) Job(name string) Group {
 	return e.Sequential()
 }
 
-func (*ExecutionTreeVisitor) Output(o *Output) interface{} {
+func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
@@ -81,7 +81,7 @@ func (*ExecutionTreeVisitor) Output(o *Output) interface{} {
 			return context.WithValue(ctx, outputKey, os.Stdout), nil
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", templatingKey)
 			log.Println(err)
@@ -138,7 +138,7 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 	return f, nil
 }
 
-func (e *ExecutionTreeVisitor) JobLogger(jobName string) interface{} {
+func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -151,7 +151,7 @@ func (e *ExecutionTreeVisitor) JobLogger(jobName string) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
+func (e *ExecutionTreeBuilder) HostLogger(jobName string, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -171,7 +171,7 @@ func (e *ExecutionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) Timeout(timeout time.Duration) interface{} {
+func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -188,7 +188,7 @@ func (e *ExecutionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) SCP(scp *ScpData) interface{} {
+func (e *ExecutionTreeBuilder) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -210,15 +210,15 @@ func (e *ExecutionTreeVisitor) SCP(scp *ScpData) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) Hosts() Group {
+func (e *ExecutionTreeBuilder) Hosts() Group {
 	return e.Parallel()
 }
 
-func (e *ExecutionTreeVisitor) Host(c *Config, h *Host) Group {
+func (e *ExecutionTreeBuilder) Host(c *Config, h *Host) Group {
 	return e.Sequential()
 }
 
-func (e *ExecutionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
+func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -241,7 +241,7 @@ func (e *ExecutionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) ContextBounds(child interface{}) interface{} {
+func (e *ExecutionTreeBuilder) ContextBounds(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -256,7 +256,7 @@ func (e *ExecutionTreeVisitor) ContextBounds(child interface{}) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) Retry(child interface{}, retries uint) interface{} {
+func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -287,14 +287,14 @@ func (e *ExecutionTreeVisitor) Retry(child interface{}, retries uint) interface{
 	})
 }
 
-func (e *ExecutionTreeVisitor) Templating(c *Config, h *Host) interface{} {
+func (e *ExecutionTreeBuilder) Templating(c *Config, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
 		return context.WithValue(ctx, templatingKey, tt), nil
 	})
 }
 
-func (*ExecutionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
+func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -315,7 +315,7 @@ func (*ExecutionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 	})
 }
 
-func (*ExecutionTreeVisitor) Forwarding(f *Forwarding) interface{} {
+func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -338,7 +338,7 @@ func (*ExecutionTreeVisitor) Forwarding(f *Forwarding) interface{} {
 	})
 }
 
-func (*ExecutionTreeVisitor) Tunnel(f *Forwarding) interface{} {
+func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -361,11 +361,11 @@ func (*ExecutionTreeVisitor) Tunnel(f *Forwarding) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) Commands(cmd *Command) Group {
+func (e *ExecutionTreeBuilder) Commands(cmd *Command) Group {
 	return e.Sequential()
 }
 
-func (*ExecutionTreeVisitor) Command(cmd *Command) interface{} {
+func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -379,7 +379,7 @@ func (*ExecutionTreeVisitor) Command(cmd *Command) interface{} {
 			return nil, fmt.Errorf("no %s available", sshClientKey)
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", templatingKey)
 			log.Println(err)
@@ -407,7 +407,7 @@ func (*ExecutionTreeVisitor) Command(cmd *Command) interface{} {
 	})
 }
 
-func (*ExecutionTreeVisitor) LocalCommand(cmd *Command) interface{} {
+func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -416,7 +416,7 @@ func (*ExecutionTreeVisitor) LocalCommand(cmd *Command) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", templatingKey)
 			log.Println(err)
@@ -465,7 +465,7 @@ func (*ExecutionTreeVisitor) LocalCommand(cmd *Command) interface{} {
 	})
 }
 
-func (e *ExecutionTreeVisitor) Stdout(o *Output) interface{} {
+func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
@@ -478,7 +478,7 @@ func (e *ExecutionTreeVisitor) Stdout(o *Output) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", templatingKey)
 			log.Println(err)
@@ -508,7 +508,7 @@ func (e *ExecutionTreeVisitor) Stdout(o *Output) interface{} {
 	})
 }
 
-func (*ExecutionTreeVisitor) Stderr(o *Output) interface{} {
+func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
@@ -521,7 +521,7 @@ func (*ExecutionTreeVisitor) Stderr(o *Output) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", templatingKey)
 			log.Println(err)

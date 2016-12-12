@@ -43,18 +43,18 @@ func (c *Config) String() string {
 // When full is true, housekeeping steps are included. When raw is true,
 // template string are output in the un-interpolated form.
 func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
-	f, err := visitConfig(&stringVisitor{
-		full:        full,
-		raw:         raw,
-		maxHosts:    maxHosts,
-		maxCommands: maxCommands,
+	f, err := visitConfig(&StringBuilder{
+		Full:        full,
+		Raw:         raw,
+		MaxHosts:    maxHosts,
+		MaxCommands: maxCommands,
 	}, c)
 	if err != nil {
 		log.Panicln(err)
 	}
 
-	return f.(stringer).String(&vars{
-		&templatingEngine{
+	return f.(Stringer).String(&Vars{
+		&TemplatingEngine{
 			Config: c,
 			now: func() time.Time {
 				return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)

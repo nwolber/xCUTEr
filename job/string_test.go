@@ -7,8 +7,8 @@ package job
 import "testing"
 
 func TestBuilderCommand(t *testing.T) {
-	s := &stringVisitor{}
-	c := s.Command(&Command{Command: "first"}).(stringer)
+	s := &StringBuilder{}
+	c := s.Command(&Command{Command: "first"}).(Stringer)
 
 	want := "Execute \"first\""
 
@@ -18,7 +18,7 @@ func TestBuilderCommand(t *testing.T) {
 }
 
 func TestBuilderMultiple(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g := s.Sequential()
 	g.Append(s.Command(&Command{Command: "first"}))
 	g.Append(s.Command(&Command{Command: "second"}))
@@ -27,24 +27,24 @@ func TestBuilderMultiple(t *testing.T) {
 		"├─ Execute \"first\"\n" +
 		"└─ Execute \"second\""
 
-	if got := g.(stringer).String(nil); got != want {
+	if got := g.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderEmptyMultiple(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g := s.Sequential()
 
 	want := "Sequential"
 
-	if got := g.(stringer).String(nil); got != want {
+	if got := g.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderNested(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g1 := s.Sequential()
 	g2 := s.Parallel()
 	g2.Append(s.Command(&Command{Command: "first"}))
@@ -58,13 +58,13 @@ func TestBuilderNested(t *testing.T) {
 		"│  └─ Execute \"third\"\n" +
 		"└─ Execute \"second\""
 
-	if got := g1.(stringer).String(nil); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderNested3(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g1 := s.Sequential()
 	g2 := s.Parallel()
 	g2.Append(s.Command(&Command{Command: "second"}))
@@ -76,13 +76,13 @@ func TestBuilderNested3(t *testing.T) {
 		"   ├─ Execute \"second\"\n" +
 		"   └─ Execute \"third\""
 
-	if got := g1.(stringer).String(nil); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestBuilderNested4(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g1 := s.Sequential()
 	g1.Append(s.Command(&Command{Command: "first"}))
 	g1.Append(s.Command(&Command{Command: "second"}))
@@ -96,13 +96,13 @@ func TestBuilderNested4(t *testing.T) {
 		"└─ Parallel\n" +
 		"   └─ Execute \"third\""
 
-	if got := g1.(stringer).String(nil); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
 
 func TestMax(t *testing.T) {
-	s := &stringVisitor{}
+	s := &StringBuilder{}
 	g1 := s.Sequential()
 	g1.(*multiple).max = 2
 	g1.Append(s.Command(&Command{Command: "first"}))
@@ -114,7 +114,7 @@ func TestMax(t *testing.T) {
 		"├─ Execute \"second\"\n" +
 		"└─ and 1 more ..."
 
-	if got := g1.(stringer).String(nil); got != want {
+	if got := g1.(Stringer).String(nil); got != want {
 		t.Errorf("want:\n%s\n\ngot:\n%s", want, got)
 	}
 }
