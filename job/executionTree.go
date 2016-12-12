@@ -64,16 +64,12 @@ func (e *executionTreeVisitor) Parallel() group {
 	return &executionGroup{group: flunc.Parallel}
 }
 
-func makeFlunc(f flunc.Flunc) flunc.Flunc {
-	return f
-}
-
 func (e *executionTreeVisitor) Job(name string) group {
 	return e.Sequential()
 }
 
 func (*executionTreeVisitor) Output(o *output) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
 		if output != nil {
@@ -142,7 +138,7 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 }
 
 func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
 			err := fmt.Errorf("no %s available", outputKey)
@@ -155,7 +151,7 @@ func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
 }
 
 func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
 			err := fmt.Errorf("no %s available", outputKey)
@@ -175,7 +171,7 @@ func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 }
 
 func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -192,7 +188,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 }
 
 func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -227,7 +223,7 @@ func (e *executionTreeVisitor) ErrorSafeguard(child interface{}) interface{} {
 		log.Panicf("not a flunc %T", child)
 	}
 
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -250,7 +246,7 @@ func (e *executionTreeVisitor) ContextBounds(child interface{}) interface{} {
 		log.Panicf("not a flunc %T", child)
 	}
 
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -265,7 +261,7 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 		log.Panicf("not a flunc %T", child)
 	}
 
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -291,14 +287,14 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 }
 
 func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
 		return context.WithValue(ctx, templatingKey, tt), nil
 	})
 }
 
 func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -319,7 +315,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 }
 
 func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -342,7 +338,7 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 }
 
 func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -369,7 +365,7 @@ func (e *executionTreeVisitor) Commands(cmd *command) group {
 }
 
 func (*executionTreeVisitor) Command(cmd *command) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -411,7 +407,7 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 }
 
 func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(loggerKey).(Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", loggerKey)
@@ -469,7 +465,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 }
 
 func (e *executionTreeVisitor) Stdout(o *output) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
 		}
@@ -512,7 +508,7 @@ func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 }
 
 func (*executionTreeVisitor) Stderr(o *output) interface{} {
-	return makeFlunc(func(ctx context.Context) (context.Context, error) {
+	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
 		}

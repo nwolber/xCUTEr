@@ -94,3 +94,11 @@ func Parallel(children ...Flunc) Flunc {
 		return nil, nil
 	}
 }
+
+// MakeFlunc turns an arbitrary function, that satisfies the signature of a Flunc
+// into a function of type flunc.Flunc.
+//
+// This is useful to do type assertions like ff, ok := f.(flunc.Func).
+func MakeFlunc(f Flunc) Flunc {
+	return f
+}
