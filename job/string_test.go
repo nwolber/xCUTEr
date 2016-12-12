@@ -8,7 +8,7 @@ import "testing"
 
 func TestBuilderCommand(t *testing.T) {
 	s := &stringVisitor{}
-	c := s.Command(&command{Command: "first"}).(stringer)
+	c := s.Command(&Command{Command: "first"}).(stringer)
 
 	want := "Execute \"first\""
 
@@ -20,8 +20,8 @@ func TestBuilderCommand(t *testing.T) {
 func TestBuilderMultiple(t *testing.T) {
 	s := &stringVisitor{}
 	g := s.Sequential()
-	g.Append(s.Command(&command{Command: "first"}))
-	g.Append(s.Command(&command{Command: "second"}))
+	g.Append(s.Command(&Command{Command: "first"}))
+	g.Append(s.Command(&Command{Command: "second"}))
 
 	want := "Sequential\n" +
 		"├─ Execute \"first\"\n" +
@@ -47,10 +47,10 @@ func TestBuilderNested(t *testing.T) {
 	s := &stringVisitor{}
 	g1 := s.Sequential()
 	g2 := s.Parallel()
-	g2.Append(s.Command(&command{Command: "first"}))
-	g2.Append(s.Command(&command{Command: "third"}))
+	g2.Append(s.Command(&Command{Command: "first"}))
+	g2.Append(s.Command(&Command{Command: "third"}))
 	g1.Append(g2.Wrap())
-	g1.Append(s.Command(&command{Command: "second"}))
+	g1.Append(s.Command(&Command{Command: "second"}))
 
 	want := "Sequential\n" +
 		"├─ Parallel\n" +
@@ -67,8 +67,8 @@ func TestBuilderNested3(t *testing.T) {
 	s := &stringVisitor{}
 	g1 := s.Sequential()
 	g2 := s.Parallel()
-	g2.Append(s.Command(&command{Command: "second"}))
-	g2.Append(s.Command(&command{Command: "third"}))
+	g2.Append(s.Command(&Command{Command: "second"}))
+	g2.Append(s.Command(&Command{Command: "third"}))
 	g1.Append(g2.Wrap())
 
 	want := "Sequential\n" +
@@ -84,10 +84,10 @@ func TestBuilderNested3(t *testing.T) {
 func TestBuilderNested4(t *testing.T) {
 	s := &stringVisitor{}
 	g1 := s.Sequential()
-	g1.Append(s.Command(&command{Command: "first"}))
-	g1.Append(s.Command(&command{Command: "second"}))
+	g1.Append(s.Command(&Command{Command: "first"}))
+	g1.Append(s.Command(&Command{Command: "second"}))
 	g2 := s.Parallel()
-	g2.Append(s.Command(&command{Command: "third"}))
+	g2.Append(s.Command(&Command{Command: "third"}))
 	g1.Append(g2.Wrap())
 
 	want := "Sequential\n" +
@@ -105,9 +105,9 @@ func TestMax(t *testing.T) {
 	s := &stringVisitor{}
 	g1 := s.Sequential()
 	g1.(*multiple).max = 2
-	g1.Append(s.Command(&command{Command: "first"}))
-	g1.Append(s.Command(&command{Command: "second"}))
-	g1.Append(s.Command(&command{Command: "third"}))
+	g1.Append(s.Command(&Command{Command: "first"}))
+	g1.Append(s.Command(&Command{Command: "second"}))
+	g1.Append(s.Command(&Command{Command: "third"}))
 
 	want := "Sequential\n" +
 		"├─ Execute \"first\"\n" +

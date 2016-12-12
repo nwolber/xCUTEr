@@ -24,31 +24,31 @@ const (
 )
 
 type configVisitor interface {
-	Sequential() group
-	Parallel() group
-	Job(name string) group
-	Output(o *output) interface{}
+	Sequential() Group
+	Parallel() Group
+	Job(name string) Group
+	Output(o *Output) interface{}
 	JobLogger(jobName string) interface{}
-	HostLogger(jobName string, h *host) interface{}
+	HostLogger(jobName string, h *Host) interface{}
 	Timeout(timeout time.Duration) interface{}
-	SCP(scp *scpData) interface{}
-	Hosts() group
-	Host(c *Config, h *host) group
+	SCP(scp *ScpData) interface{}
+	Hosts() Group
+	Host(c *Config, h *Host) Group
 	ErrorSafeguard(child interface{}) interface{}
 	ContextBounds(child interface{}) interface{}
 	Retry(child interface{}, retries uint) interface{}
-	Templating(c *Config, h *host) interface{}
+	Templating(c *Config, h *Host) interface{}
 	SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{}
-	Forwarding(f *forwarding) interface{}
-	Tunnel(f *forwarding) interface{}
-	Commands(cmd *command) group
-	Command(cmd *command) interface{}
-	LocalCommand(cmd *command) interface{}
-	Stdout(o *output) interface{}
-	Stderr(o *output) interface{}
+	Forwarding(f *Forwarding) interface{}
+	Tunnel(f *Forwarding) interface{}
+	Commands(cmd *Command) Group
+	Command(cmd *Command) interface{}
+	LocalCommand(cmd *Command) interface{}
+	Stdout(o *Output) interface{}
+	Stderr(o *Output) interface{}
 }
 
-type group interface {
+type Group interface {
 	Append(children ...interface{})
 	Wrap() interface{}
 }
@@ -133,8 +133,8 @@ func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
 }
 
 // localCommand turns any command in a command that is only executed locally
-func localCommand(c *command) *command {
-	lc := &command{
+func localCommand(c *Command) *Command {
+	lc := &Command{
 		Name:        c.Name,
 		Command:     c.Command,
 		Flow:        c.Flow,
@@ -154,7 +154,7 @@ func localCommand(c *command) *command {
 	return lc
 }
 
-func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
+func visitHost(builder configVisitor, c *Config, host *Host) (Group, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
@@ -176,7 +176,7 @@ func visitHost(builder configVisitor, c *Config, host *host) (group, error) {
 	return children, nil
 }
 
-func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
+func visitCommand(builder configVisitor, cmd *Command) (interface{}, error) {
 	const (
 		sequential = "sequential"
 		parallel   = "parallel"
@@ -240,8 +240,8 @@ func visitCommand(builder configVisitor, cmd *command) (interface{}, error) {
 	return wrappedChildren, nil
 }
 
-func visitCommands(builder configVisitor, cmd *command) (group, error) {
-	var childCommands group
+func visitCommands(builder configVisitor, cmd *Command) (Group, error) {
+	var childCommands Group
 
 	if cmd.Flow == sequentialFlow {
 		childCommands = builder.Sequential()

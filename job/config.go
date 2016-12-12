@@ -24,15 +24,15 @@ type Config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
 	Timeout    string      `json:"timeout,omitempty"`
-	Output     *output     `json:"output,omitempty"`
-	Host       *host       `json:"host,omitempty"`
+	Output     *Output     `json:"output,omitempty"`
+	Host       *Host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`
-	Pre        *command    `json:"pre,omitempty"`
-	Command    *command    `json:"command,omitempty"`
-	Post       *command    `json:"post,omitempty"`
-	Forwarding *forwarding `json:"forwarding,omitempty"`
-	Tunnel     *forwarding `json:"tunnel,omitempty"`
-	SCP        *scpData    `json:"scp,omitempty"`
+	Pre        *Command    `json:"pre,omitempty"`
+	Command    *Command    `json:"command,omitempty"`
+	Post       *Command    `json:"post,omitempty"`
+	Forwarding *Forwarding `json:"forwarding,omitempty"`
+	Tunnel     *Forwarding `json:"tunnel,omitempty"`
+	SCP        *ScpData    `json:"scp,omitempty"`
 }
 
 func (c *Config) String() string {
@@ -73,7 +73,7 @@ func (c *Config) JSON() string {
 	return string(b)
 }
 
-type hostConfig map[string]*host
+type hostConfig map[string]*Host
 
 type hostsFile struct {
 	File        string `json:"file,omitempty"`
@@ -81,7 +81,7 @@ type hostsFile struct {
 	MatchString string `json:"matchString,omitempty"`
 }
 
-type host struct {
+type Host struct {
 	Name                string            `json:"name,omitempty"`
 	Addr                string            `json:"addr,omitempty"`
 	Port                uint              `json:"port,omitempty"`
@@ -92,17 +92,17 @@ type host struct {
 	Tags                map[string]string `json:"tags,omitempty"`
 }
 
-type output struct {
+type Output struct {
 	File      string `json:"file,omitempty"`
 	Raw       bool   `json:"raw,omitempty"`
 	Overwrite bool   `json:"overwrite,omitempty"`
 }
 
-func (o output) String() string {
+func (o Output) String() string {
 	return fmt.Sprintf("%s, Raw: %t, Overwrite: %t", o.File, o.Raw, o.Overwrite)
 }
 
-func (o *output) MarshalJSON() ([]byte, error) {
+func (o *Output) MarshalJSON() ([]byte, error) {
 	if !o.Raw && !o.Overwrite {
 		return []byte(o.File), nil
 	}
@@ -115,7 +115,7 @@ func (o *output) MarshalJSON() ([]byte, error) {
 	return json.Marshal(obj)
 }
 
-func (o *output) UnmarshalJSON(b []byte) error {
+func (o *Output) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &o.File); err == nil {
 		return nil
 	}
@@ -141,30 +141,30 @@ func (o *output) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type forwarding struct {
+type Forwarding struct {
 	RemoteHost string `json:"remoteHost,omitempty"`
 	RemotePort uint16 `json:"remotePort,omitempty"`
 	LocalHost  string `json:"localHost,omitempty"`
 	LocalPort  uint16 `json:"localPort,omitempty"`
 }
 
-type scpData struct {
+type ScpData struct {
 	Addr    string `json:"addr,omitempty"`
 	Port    uint   `json:"port,omitempty"`
 	Key     string `json:"key,omitempty"`
 	Verbose bool   `json:"verbose,omitempty"`
 }
 
-type command struct {
+type Command struct {
 	Name        string     `json:"name,omitempty"`
 	Command     string     `json:"command,omitempty"`
-	Commands    []*command `json:"commands,omitempty"`
+	Commands    []*Command `json:"commands,omitempty"`
 	Flow        string     `json:"flow,omitempty"`
 	Target      string     `json:"target,omitempty"`
 	Retries     uint       `json:"retries,omitempty"`
 	IgnoreError bool       `json:"ignoreError,omitempty"`
-	Stdout      *output    `json:"stdout,omitempty"`
-	Stderr      *output    `json:"stderr,omitempty"`
+	Stdout      *Output    `json:"stdout,omitempty"`
+	Stderr      *Output    `json:"stderr,omitempty"`
 }
 
 // ReadConfig parses the file into a Config.
@@ -277,7 +277,7 @@ func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, err
 	return filteredHosts, nil
 }
 
-func interpolate(text string, h *host) (string, error) {
+func interpolate(text string, h *Host) (string, error) {
 	t, err := template.New("").Parse(text)
 	if err != nil {
 		return "", err

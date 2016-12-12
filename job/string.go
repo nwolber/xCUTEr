@@ -104,26 +104,26 @@ func (s *multiple) String(v *vars) string {
 	return str
 }
 
-func (*stringVisitor) Sequential() group {
+func (*stringVisitor) Sequential() Group {
 	return &multiple{
 		typ: "Sequential",
 	}
 }
 
-func (*stringVisitor) Parallel() group {
+func (*stringVisitor) Parallel() Group {
 	return &multiple{
 		typ: "Parallel",
 	}
 }
 
-func (s *stringVisitor) Job(name string) group {
+func (s *stringVisitor) Job(name string) Group {
 	return &multiple{
 		typ: name,
 		raw: s.raw,
 	}
 }
 
-func (s *stringVisitor) Output(o *output) interface{} {
+func (s *stringVisitor) Output(o *Output) interface{} {
 	if o == nil {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (s *stringVisitor) JobLogger(jobName string) interface{} {
 	return nil
 }
 
-func (s *stringVisitor) HostLogger(jobName string, h *host) interface{} {
+func (s *stringVisitor) HostLogger(jobName string, h *Host) interface{} {
 	if s.full {
 		return simple("Create host logger")
 	}
@@ -149,11 +149,11 @@ func (*stringVisitor) Timeout(timeout time.Duration) interface{} {
 	return simple(fmt.Sprint("Timeout: ", timeout))
 }
 
-func (*stringVisitor) SCP(scp *scpData) interface{} {
+func (*stringVisitor) SCP(scp *ScpData) interface{} {
 	return simple(fmt.Sprintf("SCP listen on %s:%d", scp.Addr, scp.Port))
 }
 
-func (s *stringVisitor) Hosts() group {
+func (s *stringVisitor) Hosts() Group {
 	return &multiple{
 		typ: "Target hosts",
 		max: s.maxHosts,
@@ -162,7 +162,7 @@ func (s *stringVisitor) Hosts() group {
 
 type partHost struct {
 	*multiple
-	h *host
+	h *Host
 }
 
 func (p *partHost) Append(children ...interface{}) {
@@ -187,7 +187,7 @@ func (p *partHost) String(v *vars) string {
 	return p.multiple.String(vr)
 }
 
-func (s *stringVisitor) Host(c *Config, h *host) group {
+func (s *stringVisitor) Host(c *Config, h *Host) Group {
 	var name string
 
 	if h.Name != "" {
@@ -254,7 +254,7 @@ func (s *stringVisitor) Retry(child interface{}, retries uint) interface{} {
 	}
 }
 
-func (s *stringVisitor) Templating(c *Config, h *host) interface{} {
+func (s *stringVisitor) Templating(c *Config, h *Host) interface{} {
 	if s.full {
 		return simple("Create templating engine")
 	}
@@ -265,22 +265,22 @@ func (*stringVisitor) SSHClient(host, user, keyFile, password string, keyboardIn
 	return simple(fmt.Sprintf("Open SSH connection to %s@%s", user, host))
 }
 
-func (*stringVisitor) Forwarding(f *forwarding) interface{} {
+func (*stringVisitor) Forwarding(f *Forwarding) interface{} {
 	return simple(fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort))
 }
 
-func (*stringVisitor) Tunnel(f *forwarding) interface{} {
+func (*stringVisitor) Tunnel(f *Forwarding) interface{} {
 	return simple(fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort))
 }
 
-func (s *stringVisitor) Commands(cmd *command) group {
+func (s *stringVisitor) Commands(cmd *Command) Group {
 	return &multiple{
 		typ: "Command",
 		max: s.maxCommands,
 	}
 }
 
-func (s *stringVisitor) Command(cmd *command) interface{} {
+func (s *stringVisitor) Command(cmd *Command) interface{} {
 	var str string
 	if cmd.Command != "" {
 		str = fmt.Sprintf("Execute %q", cmd.Command)
@@ -291,7 +291,7 @@ func (s *stringVisitor) Command(cmd *command) interface{} {
 	return simple(str)
 }
 
-func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
+func (s *stringVisitor) LocalCommand(cmd *Command) interface{} {
 	var str string
 	if cmd.Command != "" {
 		str = fmt.Sprintf("Execute %q locally", cmd.Command)
@@ -302,7 +302,7 @@ func (s *stringVisitor) LocalCommand(cmd *command) interface{} {
 	return simple(str)
 }
 
-func (s *stringVisitor) Stdout(o *output) interface{} {
+func (s *stringVisitor) Stdout(o *Output) interface{} {
 	if o.File == "null" {
 		return simple("Discard any output from STDOUT")
 	}
@@ -310,7 +310,7 @@ func (s *stringVisitor) Stdout(o *output) interface{} {
 	return simple(fmt.Sprintf("Redirect STDOUT to %s", o))
 }
 
-func (s *stringVisitor) Stderr(o *output) interface{} {
+func (s *stringVisitor) Stderr(o *Output) interface{} {
 	if o.File == "null" {
 		return simple("Discard any output from STDERR")
 	}

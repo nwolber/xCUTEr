@@ -56,19 +56,19 @@ func (g *executionGroup) Wrap() interface{} {
 
 type executionTreeVisitor struct{}
 
-func (e *executionTreeVisitor) Sequential() group {
+func (e *executionTreeVisitor) Sequential() Group {
 	return &executionGroup{group: flunc.Sequential}
 }
 
-func (e *executionTreeVisitor) Parallel() group {
+func (e *executionTreeVisitor) Parallel() Group {
 	return &executionGroup{group: flunc.Parallel}
 }
 
-func (e *executionTreeVisitor) Job(name string) group {
+func (e *executionTreeVisitor) Job(name string) Group {
 	return e.Sequential()
 }
 
-func (*executionTreeVisitor) Output(o *output) interface{} {
+func (*executionTreeVisitor) Output(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(outputKey).(io.Writer)
 
@@ -150,7 +150,7 @@ func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
+func (e *executionTreeVisitor) HostLogger(jobName string, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(outputKey).(io.Writer)
 		if !ok {
@@ -187,7 +187,7 @@ func (e *executionTreeVisitor) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
+func (e *executionTreeVisitor) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -209,11 +209,11 @@ func (e *executionTreeVisitor) SCP(scp *scpData) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Hosts() group {
+func (e *executionTreeVisitor) Hosts() Group {
 	return e.Parallel()
 }
 
-func (e *executionTreeVisitor) Host(c *Config, h *host) group {
+func (e *executionTreeVisitor) Host(c *Config, h *Host) Group {
 	return e.Sequential()
 }
 
@@ -286,7 +286,7 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 	})
 }
 
-func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
+func (e *executionTreeVisitor) Templating(c *Config, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
 		return context.WithValue(ctx, templatingKey, tt), nil
@@ -314,7 +314,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 	})
 }
 
-func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
+func (*executionTreeVisitor) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -337,7 +337,7 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
+func (*executionTreeVisitor) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -360,11 +360,11 @@ func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Commands(cmd *command) group {
+func (e *executionTreeVisitor) Commands(cmd *Command) Group {
 	return e.Sequential()
 }
 
-func (*executionTreeVisitor) Command(cmd *command) interface{} {
+func (*executionTreeVisitor) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -406,7 +406,7 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
+func (*executionTreeVisitor) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
@@ -464,7 +464,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 	})
 }
 
-func (e *executionTreeVisitor) Stdout(o *output) interface{} {
+func (e *executionTreeVisitor) Stdout(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
@@ -507,7 +507,7 @@ func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 	})
 }
 
-func (*executionTreeVisitor) Stderr(o *output) interface{} {
+func (*executionTreeVisitor) Stderr(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil

@@ -14,7 +14,7 @@ func TestUnmarshalOutput(t *testing.T) {
 		{
 			input: `{"output": "stdout.txt"}`,
 			want: Config{
-				Output: &output{
+				Output: &Output{
 					File: "stdout.txt",
 				},
 			},
@@ -28,7 +28,7 @@ func TestUnmarshalOutput(t *testing.T) {
                     }
                 }`,
 			want: Config{
-				Output: &output{
+				Output: &Output{
 					File:      "stderr.txt",
 					Raw:       true,
 					Overwrite: true,
@@ -60,7 +60,7 @@ func TestFilterHosts(t *testing.T) {
 	matchString := "{{.Tags.provider}}"
 
 	host1Name := "Fancy server"
-	host1 := &host{
+	host1 := &Host{
 		Addr:     "thaddeus.example.com",
 		Port:     1337,
 		User:     "me",
@@ -71,7 +71,7 @@ func TestFilterHosts(t *testing.T) {
 	}
 
 	host2Name := "Crappy box"
-	host2 := &host{
+	host2 := &Host{
 		Addr:     "eugene.example.com",
 		Port:     15289,
 		User:     "me",

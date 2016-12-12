@@ -15,7 +15,7 @@ import (
 
 type templatingEngine struct {
 	Config *Config
-	Host   *host
+	Host   *Host
 	Env    map[string]string
 	now    func() time.Time
 }
@@ -31,7 +31,7 @@ func getEnv() map[string]string {
 	return env
 }
 
-func newTemplatingEngine(c *Config, h *host) *templatingEngine {
+func newTemplatingEngine(c *Config, h *Host) *templatingEngine {
 	return &templatingEngine{
 		Config: c,
 		Host:   h,
@@ -64,7 +64,7 @@ func (t *templatingEngine) Interpolate(templ string) (string, error) {
 
 	data := struct {
 		Config *Config
-		Host   *host
+		Host   *Host
 		Env    map[string]string
 		Now    time.Time
 	}{

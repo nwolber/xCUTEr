@@ -422,7 +422,7 @@ func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) 
 }
 
 type stringerGroup interface {
-	group
+	Group
 	stringer
 }
 
@@ -507,7 +507,7 @@ func (t *telemetryBuilder) update(status NodeStatus, typ, text string) {
 	}
 }
 
-func (t *telemetryBuilder) Sequential() group {
+func (t *telemetryBuilder) Sequential() Group {
 	var g nodeGroup
 	g.typ = "Sequential"
 	g.update = t.update
@@ -516,7 +516,7 @@ func (t *telemetryBuilder) Sequential() group {
 	return &g
 }
 
-func (t *telemetryBuilder) Parallel() group {
+func (t *telemetryBuilder) Parallel() Group {
 	var g nodeGroup
 	g.typ = "Parallel"
 	g.update = t.update
@@ -525,7 +525,7 @@ func (t *telemetryBuilder) Parallel() group {
 	return &g
 }
 
-func (t *telemetryBuilder) Job(name string) group {
+func (t *telemetryBuilder) Job(name string) Group {
 	var g nodeGroup
 	g.update = t.update
 	g.exec = t.exec.Job(name).(*executionGroup)
@@ -535,7 +535,7 @@ func (t *telemetryBuilder) Job(name string) group {
 	return &g
 }
 
-func (t *telemetryBuilder) Output(o *output) interface{} {
+func (t *telemetryBuilder) Output(o *Output) interface{} {
 	if o == nil {
 		return nil
 	}
@@ -555,7 +555,7 @@ func (t *telemetryBuilder) JobLogger(jobName string) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) HostLogger(jobName string, h *host) interface{} {
+func (t *telemetryBuilder) HostLogger(jobName string, h *Host) interface{} {
 	var n simpleNode
 	n.typ = "Host logger"
 	n.str = t.str.HostLogger(jobName, h).(stringer)
@@ -571,7 +571,7 @@ func (t *telemetryBuilder) Timeout(timeout time.Duration) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) SCP(scp *scpData) interface{} {
+func (t *telemetryBuilder) SCP(scp *ScpData) interface{} {
 	var n simpleNode
 	n.typ = "SCP"
 	n.str = t.str.SCP(scp).(stringer)
@@ -579,7 +579,7 @@ func (t *telemetryBuilder) SCP(scp *scpData) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Hosts() group {
+func (t *telemetryBuilder) Hosts() Group {
 	var g nodeGroup
 	g.typ = "Target hosts"
 	g.update = t.update
@@ -588,7 +588,7 @@ func (t *telemetryBuilder) Hosts() group {
 	return &g
 }
 
-func (t *telemetryBuilder) Host(c *Config, h *host) group {
+func (t *telemetryBuilder) Host(c *Config, h *Host) Group {
 	var g nodeGroup
 	g.update = t.update
 	g.exec = t.exec.Host(c, h).(*executionGroup)
@@ -622,7 +622,7 @@ func (t *telemetryBuilder) Retry(child interface{}, retries uint) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Templating(c *Config, h *host) interface{} {
+func (t *telemetryBuilder) Templating(c *Config, h *Host) interface{} {
 	var n simpleNode
 	n.typ = "Templating"
 	n.str = t.str.Templating(c, h).(stringer)
@@ -639,7 +639,7 @@ func (t *telemetryBuilder) SSHClient(host, user, keyFile, password string, keybo
 	return &n
 }
 
-func (t *telemetryBuilder) Forwarding(f *forwarding) interface{} {
+func (t *telemetryBuilder) Forwarding(f *Forwarding) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Forward %s:%d to %s:%d", f.RemoteHost, f.RemotePort, f.LocalHost, f.LocalPort)
 	n.str = t.str.Forwarding(f).(stringer)
@@ -647,7 +647,7 @@ func (t *telemetryBuilder) Forwarding(f *forwarding) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Tunnel(f *forwarding) interface{} {
+func (t *telemetryBuilder) Tunnel(f *Forwarding) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Tunnel %s:%d to %s:%d", f.LocalHost, f.LocalPort, f.RemoteHost, f.RemotePort)
 	n.str = t.str.Tunnel(f).(stringer)
@@ -655,7 +655,7 @@ func (t *telemetryBuilder) Tunnel(f *forwarding) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Commands(cmd *command) group {
+func (t *telemetryBuilder) Commands(cmd *Command) Group {
 	var g nodeGroup
 	g.typ = "Command"
 	g.update = t.update
@@ -664,7 +664,7 @@ func (t *telemetryBuilder) Commands(cmd *command) group {
 	return &g
 }
 
-func (t *telemetryBuilder) Command(cmd *command) interface{} {
+func (t *telemetryBuilder) Command(cmd *Command) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Command %q", cmd.Command)
 	n.str = t.str.Command(cmd).(stringer)
@@ -672,7 +672,7 @@ func (t *telemetryBuilder) Command(cmd *command) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) LocalCommand(cmd *command) interface{} {
+func (t *telemetryBuilder) LocalCommand(cmd *Command) interface{} {
 	var n simpleNode
 	n.typ = fmt.Sprintf("Local Command %q", cmd.Command)
 	n.str = t.str.LocalCommand(cmd).(stringer)
@@ -680,7 +680,7 @@ func (t *telemetryBuilder) LocalCommand(cmd *command) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Stdout(o *output) interface{} {
+func (t *telemetryBuilder) Stdout(o *Output) interface{} {
 	var n simpleNode
 	n.typ = "Stdout"
 	n.str = t.str.Stdout(o).(stringer)
@@ -688,7 +688,7 @@ func (t *telemetryBuilder) Stdout(o *output) interface{} {
 	return &n
 }
 
-func (t *telemetryBuilder) Stderr(o *output) interface{} {
+func (t *telemetryBuilder) Stderr(o *Output) interface{} {
 	var n simpleNode
 	n.typ = "Stderr"
 	n.str = t.str.Stderr(o).(stringer)
