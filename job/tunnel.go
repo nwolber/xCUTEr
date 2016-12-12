@@ -21,7 +21,7 @@ import (
 //
 // Allocated resources will be released, when the context completes.
 func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
-	l, ok := ctx.Value(loggerKey).(Logger)
+	l, ok := ctx.Value(LoggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -41,7 +41,7 @@ func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, l
 //
 // Allocated resources will be released, when the context completes.
 func forwardLocal(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
-	l, ok := ctx.Value(loggerKey).(Logger)
+	l, ok := ctx.Value(LoggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}
@@ -59,7 +59,7 @@ func forwardLocal(ctx context.Context, client *ssh.Client, remoteAddr string, lo
 type dial func(network, address string) (net.Conn, error)
 
 func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) {
-	l, ok := ctx.Value(loggerKey).(Logger)
+	l, ok := ctx.Value(LoggerKey).(Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}

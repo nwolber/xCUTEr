@@ -385,7 +385,7 @@ func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) 
 			}
 		}
 
-		origLogger, ok := origCtx.Value(loggerKey).(Logger)
+		origLogger, ok := origCtx.Value(LoggerKey).(Logger)
 		for ok {
 			var l *interceptLogger
 			l, ok = origLogger.(*interceptLogger)
@@ -396,7 +396,7 @@ func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) 
 			origLogger = l.orig
 		}
 
-		ctx := context.WithValue(origCtx, loggerKey, &interceptLogger{orig: origLogger, log: n.Log})
+		ctx := context.WithValue(origCtx, LoggerKey, &interceptLogger{orig: origLogger, log: n.Log})
 		interceptCtx := &interceptContext{Context: ctx}
 
 		n.Status(RunningNode, "")

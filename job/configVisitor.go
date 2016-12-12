@@ -16,7 +16,7 @@ const (
 	parallelFlow   = "parallel"
 
 	outputKey     = "output"
-	loggerKey     = "logger"
+	LoggerKey     = "logger"
 	sshClientKey  = "sshClient"
 	templatingKey = "templating"
 	stdoutKey     = "stdout"

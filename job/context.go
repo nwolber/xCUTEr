@@ -34,9 +34,9 @@ func accept(ctx context.Context, l net.Listener) <-chan acceptMsg {
 
 	go func(ctx context.Context, l net.Listener) {
 		<-ctx.Done()
-		logger, ok := ctx.Value(loggerKey).(Logger)
+		logger, ok := ctx.Value(LoggerKey).(Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", loggerKey)
+			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
 			return
 		}
