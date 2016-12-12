@@ -190,8 +190,8 @@ var (
 
 // removeLineComments removes any line from r that starts with indictor
 // after removing preceding whitespace (according to unicode.IsSpace).
-func removeLineComments(r io.Reader, indicator string) io.Reader {
-	s := bufio.NewScanner(r)
+func removeLineComments(reader io.Reader, indicator string) io.ReadCloser {
+	s := bufio.NewScanner(reader)
 	r, w := io.Pipe()
 
 	if commentRegex == nil {
@@ -221,6 +221,11 @@ func parseConfig(r io.Reader) (*Config, error) {
 
 	var c Config
 	err := d.Decode(&c)
+
+	if closer, ok := r.(io.Closer); ok {
+		closer.Close()
+	}
+
 	return &c, err
 }
 
