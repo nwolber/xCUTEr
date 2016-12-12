@@ -82,6 +82,8 @@ func waitConn(client *ssh.Client) chan error {
 func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	key := fmt.Sprintf("%s@%s", user, addr)
 
+	// lock store only briefly while finding out if there is an existing client
+	// thus creation of a new client won't block all other client requests
 	elem, ok := func() (*storeElement, bool) {
 		store.m.Lock()
 		defer store.m.Unlock()
