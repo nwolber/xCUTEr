@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 type acceptMsg struct {
@@ -34,7 +36,7 @@ func accept(ctx context.Context, l net.Listener) <-chan acceptMsg {
 
 	go func(ctx context.Context, l net.Listener) {
 		<-ctx.Done()
-		logger, ok := ctx.Value(LoggerKey).(Logger)
+		logger, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)

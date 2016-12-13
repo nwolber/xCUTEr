@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 type storeElement struct {
@@ -235,7 +237,7 @@ func keyboardInteractiveChallenge(user string, keyboardInteractive map[string]st
 }
 
 func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
-	l, ok := ctx.Value(LoggerKey).(Logger)
+	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
 		l = log.New(os.Stderr, "", log.LstdFlags)
 	}

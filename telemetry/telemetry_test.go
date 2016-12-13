@@ -14,6 +14,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 func expect(t *testing.T, name string, want, got interface{}) bool {
@@ -78,7 +79,7 @@ func TestInstrument(t *testing.T) {
 		})
 
 		loggingFlunc = flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-			logger := ctx.Value(job.LoggerKey).(job.Logger)
+			logger := ctx.Value(job.LoggerKey).(logger.Logger)
 
 			logger.Print(logText)
 

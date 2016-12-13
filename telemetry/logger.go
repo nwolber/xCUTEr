@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/nwolber/xCUTEr/job"
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 type LogInfo struct {
@@ -20,7 +20,7 @@ type LogInfo struct {
 }
 
 type telemetryLogger struct {
-	orig   job.Logger
+	orig   logger.Logger
 	name   string
 	events chan<- Event
 }

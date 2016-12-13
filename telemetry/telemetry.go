@@ -10,6 +10,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 type EventType uint
@@ -109,8 +110,8 @@ func (ctx *interceptContext) Done() <-chan struct{}                   { return c
 func (ctx *interceptContext) Err() error                              { return ctx.Context.Err() }
 func (ctx *interceptContext) Value(key interface{}) interface{}       { return ctx.Context.Value(key) }
 
-func findOriginalLogger(ctx context.Context) job.Logger {
-	origLogger, ok := ctx.Value(job.LoggerKey).(job.Logger)
+func findOriginalLogger(ctx context.Context) logger.Logger {
+	origLogger, ok := ctx.Value(job.LoggerKey).(logger.Logger)
 	for ok {
 		var l *telemetryLogger
 		l, ok = origLogger.(*telemetryLogger)

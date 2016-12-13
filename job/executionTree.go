@@ -17,6 +17,7 @@ import (
 
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/nwolber/xCUTEr/flunc"
+	"github.com/nwolber/xCUTEr/logger"
 )
 
 // ExecutionTree creates the execution tree necessary to executeCommand
@@ -173,7 +174,7 @@ func (e *ExecutionTreeBuilder) HostLogger(jobName string, h *Host) interface{} {
 
 func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -190,7 +191,7 @@ func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 
 func (e *ExecutionTreeBuilder) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -225,7 +226,7 @@ func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 	}
 
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -263,7 +264,7 @@ func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{
 	}
 
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -296,7 +297,7 @@ func (e *ExecutionTreeBuilder) Templating(c *Config, h *Host) interface{} {
 
 func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -317,7 +318,7 @@ func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, key
 
 func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -340,7 +341,7 @@ func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 
 func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -367,7 +368,7 @@ func (e *ExecutionTreeBuilder) Commands(cmd *Command) Group {
 
 func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -409,7 +410,7 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 
 func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -471,7 +472,7 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
 		}
 
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
@@ -514,7 +515,7 @@ func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
 		}
 
-		l, ok := ctx.Value(LoggerKey).(Logger)
+		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
 			err := fmt.Errorf("no %s available", LoggerKey)
 			log.Println(err)
