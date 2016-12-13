@@ -33,7 +33,9 @@ type telemetryBuilder struct {
 	exec   *job.ExecutionTreeBuilder
 }
 
-func NewTelemetryBuilder(events chan<- Event) job.ConfigBuilder {
+// NewBuilder returns a ConfigBuilder that instruments the
+// execution tree for gathering telemetry information.
+func NewBuilder(events chan<- Event) job.ConfigBuilder {
 	fmt.Println(events)
 	return &NamingBuilder{
 		NamedConfigBuilder: &telemetryBuilder{

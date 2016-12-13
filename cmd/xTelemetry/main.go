@@ -28,7 +28,7 @@ func main() {
 	}
 
 	events := make(chan telemetry.Event)
-	builder := telemetry.NewTelemetryBuilder(events)
+	builder := telemetry.NewBuilder(events)
 	f, err := job.VisitConfig(builder, config)
 	if err != nil {
 		log.Fatalln("error instrumenting execution tree:", err)
