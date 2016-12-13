@@ -17,7 +17,7 @@ func TestBuilderCommand(t *testing.T) {
 	}
 }
 
-func TestBuilderMultiple(t *testing.T) {
+func TestBuilderBranch(t *testing.T) {
 	s := &StringBuilder{}
 	g := s.Sequential()
 	g.Append(s.Command(&Command{Command: "first"}))
@@ -32,7 +32,7 @@ func TestBuilderMultiple(t *testing.T) {
 	}
 }
 
-func TestBuilderEmptyMultiple(t *testing.T) {
+func TestBuilderEmptyBranch(t *testing.T) {
 	s := &StringBuilder{}
 	g := s.Sequential()
 
@@ -104,7 +104,7 @@ func TestBuilderNested4(t *testing.T) {
 func TestMax(t *testing.T) {
 	s := &StringBuilder{}
 	g1 := s.Sequential()
-	g1.(*multiple).max = 2
+	g1.(*SimpleBranch).max = 2
 	g1.Append(s.Command(&Command{Command: "first"}))
 	g1.Append(s.Command(&Command{Command: "second"}))
 	g1.Append(s.Command(&Command{Command: "third"}))

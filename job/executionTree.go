@@ -22,7 +22,7 @@ import (
 // ExecutionTree creates the execution tree necessary to executeCommand
 // the configured steps.
 func (c *Config) ExecutionTree() (flunc.Flunc, error) {
-	f, err := visitConfig(&ExecutionTreeBuilder{}, c)
+	f, err := VisitConfig(&ExecutionTreeBuilder{}, c)
 	if err != nil {
 		return nil, err
 	}

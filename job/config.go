@@ -43,7 +43,7 @@ func (c *Config) String() string {
 // When full is true, housekeeping steps are included. When raw is true,
 // template string are output in the un-interpolated form.
 func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
-	f, err := visitConfig(&StringBuilder{
+	f, err := VisitConfig(&StringBuilder{
 		Full:        full,
 		Raw:         raw,
 		MaxHosts:    maxHosts,

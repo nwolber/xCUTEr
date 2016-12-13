@@ -60,7 +60,7 @@ func (t *TelemetryInfo) GetFlunc() (flunc.Flunc, <-chan string) {
 // Instrument the given job.
 func Instrument(c *Config) (*TelemetryInfo, error) {
 	t := newTelemtryBuilder()
-	ret, err := visitConfig(t, c)
+	ret, err := VisitConfig(t, c)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +512,7 @@ func (t *telemetryBuilder) Sequential() Group {
 	g.typ = "Sequential"
 	g.update = t.update
 	g.exec = t.exec.Sequential().(*executionGroup)
-	g.str = t.str.Sequential().(*multiple)
+	g.str = t.str.Sequential().(*SimpleBranch)
 	return &g
 }
 
@@ -521,7 +521,7 @@ func (t *telemetryBuilder) Parallel() Group {
 	g.typ = "Parallel"
 	g.update = t.update
 	g.exec = t.exec.Parallel().(*executionGroup)
-	g.str = t.str.Parallel().(*multiple)
+	g.str = t.str.Parallel().(*SimpleBranch)
 	return &g
 }
 
@@ -529,9 +529,9 @@ func (t *telemetryBuilder) Job(name string) Group {
 	var g nodeGroup
 	g.update = t.update
 	g.exec = t.exec.Job(name).(*executionGroup)
-	str := t.str.Job(name).(*multiple)
+	str := t.str.Job(name).(*SimpleBranch)
 	g.str = str
-	g.typ = str.typ
+	g.typ = string(str.Root)
 	return &g
 }
 
@@ -584,7 +584,7 @@ func (t *telemetryBuilder) Hosts() Group {
 	g.typ = "Target hosts"
 	g.update = t.update
 	g.exec = t.exec.Hosts().(*executionGroup)
-	g.str = t.str.Hosts().(*multiple)
+	g.str = t.str.Hosts().(*SimpleBranch)
 	return &g
 }
 
@@ -594,7 +594,7 @@ func (t *telemetryBuilder) Host(c *Config, h *Host) Group {
 	g.exec = t.exec.Host(c, h).(*executionGroup)
 	str := t.str.Host(c, h).(*partHost)
 	g.str = str
-	g.typ = str.typ
+	g.typ = string(str.Root)
 	return &g
 }
 
@@ -660,7 +660,7 @@ func (t *telemetryBuilder) Commands(cmd *Command) Group {
 	g.typ = "Command"
 	g.update = t.update
 	g.exec = t.exec.Commands(cmd).(*executionGroup)
-	g.str = t.str.Commands(cmd).(*multiple)
+	g.str = t.str.Commands(cmd).(*SimpleBranch)
 	return &g
 }
 

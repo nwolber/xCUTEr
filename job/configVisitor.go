@@ -23,7 +23,7 @@ const (
 	stderrKey     = "stderr"
 )
 
-type configVisitor interface {
+type ConfigBuilder interface {
 	Sequential() Group
 	Parallel() Group
 	Job(name string) Group
@@ -53,7 +53,7 @@ type Group interface {
 	Wrap() interface{}
 }
 
-func visitConfig(builder configVisitor, c *Config) (interface{}, error) {
+func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Host == nil && c.HostsFile == nil {
 		return nil, errors.New("either 'host' or 'hostsFile' must be present")
 	}
@@ -154,7 +154,7 @@ func localCommand(c *Command) *Command {
 	return lc
 }
 
-func visitHost(builder configVisitor, c *Config, host *Host) (Group, error) {
+func visitHost(builder ConfigBuilder, c *Config, host *Host) (Group, error) {
 	if c.Command == nil {
 		return nil, errors.New("config does not contain any commands")
 	}
@@ -176,7 +176,7 @@ func visitHost(builder configVisitor, c *Config, host *Host) (Group, error) {
 	return children, nil
 }
 
-func visitCommand(builder configVisitor, cmd *Command) (interface{}, error) {
+func visitCommand(builder ConfigBuilder, cmd *Command) (interface{}, error) {
 	const (
 		sequential = "sequential"
 		parallel   = "parallel"
@@ -240,7 +240,7 @@ func visitCommand(builder configVisitor, cmd *Command) (interface{}, error) {
 	return wrappedChildren, nil
 }
 
-func visitCommands(builder configVisitor, cmd *Command) (Group, error) {
+func visitCommands(builder ConfigBuilder, cmd *Command) (Group, error) {
 	var childCommands Group
 
 	if cmd.Flow == sequentialFlow {
