@@ -24,6 +24,7 @@ type Config struct {
 	Name       string      `json:"name,omitempty"`
 	Schedule   string      `json:"schedule,omitempty"`
 	Timeout    string      `json:"timeout,omitempty"`
+	Telemetry  bool        `json:"telemetry,omitempty"`
 	Output     *Output     `json:"output,omitempty"`
 	Host       *Host       `json:"host,omitempty"`
 	HostsFile  *hostsFile  `json:"hosts,omitempty"`

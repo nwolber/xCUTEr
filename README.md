@@ -181,6 +181,13 @@ The syntax can be found [here](https://godoc.org/time#ParseDuration).
 "timeout": "30s"
 ```
 
+##### Telemetry
+Whether to send telemetry information for this job.
+Default is `false`.
+```json
+"telemetry": true
+```
+
 ##### Output
 File where to redirect STDOUT and STDERR of the job.
 Supports *[templating](#templating)*.
