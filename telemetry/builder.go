@@ -48,6 +48,16 @@ func (e *EventStore) Get() []Event {
 	return events
 }
 
+// Reset clears all events and returns a copy of all
+// events that have been cleared.
+func (e *EventStore) Reset() []Event {
+	e.m.Lock()
+	defer e.m.Unlock()
+	events := e.events
+	e.events = []Event{}
+	return events
+}
+
 type telemetryBuilder struct {
 	events *EventStore
 	exec   *job.ExecutionTreeBuilder
@@ -55,6 +65,8 @@ type telemetryBuilder struct {
 
 // NewBuilder returns a ConfigBuilder that instruments the
 // execution tree for gathering telemetry information.
+// It also returns an EventStore that gets populated with
+// Events during execution.
 func NewBuilder() (job.ConfigBuilder, *EventStore) {
 	events := &EventStore{}
 	return &NamingBuilder{
