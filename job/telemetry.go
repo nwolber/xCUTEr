@@ -375,7 +375,7 @@ func (ctx *interceptContext) Value(key interface{}) interface{}       { return c
 
 func instrument(update func(NodeStatus, string, string), n node, f flunc.Flunc) flunc.Flunc {
 	return flunc.MakeFlunc(func(origCtx context.Context) (context.Context, error) {
-		tt, _ := origCtx.Value(templatingKey).(*templatingEngine)
+		tt, _ := origCtx.Value(TemplatingKey).(*templatingEngine)
 		if tt != nil {
 			switch nn := n.(type) {
 			case *simpleNode:

@@ -15,12 +15,12 @@ const (
 	sequentialFlow = "sequential"
 	parallelFlow   = "parallel"
 
-	outputKey     = "output"
+	OutputKey     = "output"
 	LoggerKey     = "logger"
-	sshClientKey  = "sshClient"
-	templatingKey = "templating"
-	stdoutKey     = "stdout"
-	stderrKey     = "stderr"
+	SshClientKey  = "sshClient"
+	TemplatingKey = "templating"
+	StdoutKey     = "stdout"
+	StderrKey     = "stderr"
 )
 
 type configVisitor interface {

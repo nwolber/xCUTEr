@@ -70,19 +70,19 @@ func (e *executionTreeVisitor) Job(name string) group {
 
 func (*executionTreeVisitor) Output(o *output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, _ := ctx.Value(outputKey).(io.Writer)
+		output, _ := ctx.Value(OutputKey).(io.Writer)
 
 		if output != nil {
 			return ctx, nil
 		}
 
 		if o == nil {
-			return context.WithValue(ctx, outputKey, os.Stdout), nil
+			return context.WithValue(ctx, OutputKey, os.Stdout), nil
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -107,10 +107,10 @@ func (*executionTreeVisitor) Output(o *output) interface{} {
 		}(ctx, f)
 
 		if output != nil {
-			return context.WithValue(ctx, outputKey, io.MultiWriter(f, output)), nil
+			return context.WithValue(ctx, OutputKey, io.MultiWriter(f, output)), nil
 		}
 
-		return context.WithValue(ctx, outputKey, f), nil
+		return context.WithValue(ctx, OutputKey, f), nil
 	})
 }
 
@@ -139,9 +139,9 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 
 func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, ok := ctx.Value(outputKey).(io.Writer)
+		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", outputKey)
+			err := fmt.Errorf("no %s available", OutputKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -152,9 +152,9 @@ func (e *executionTreeVisitor) JobLogger(jobName string) interface{} {
 
 func (e *executionTreeVisitor) HostLogger(jobName string, h *host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, ok := ctx.Value(outputKey).(io.Writer)
+		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", outputKey)
+			err := fmt.Errorf("no %s available", OutputKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -289,7 +289,7 @@ func (e *executionTreeVisitor) Retry(child interface{}, retries uint) interface{
 func (e *executionTreeVisitor) Templating(c *Config, h *host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
-		return context.WithValue(ctx, templatingKey, tt), nil
+		return context.WithValue(ctx, TemplatingKey, tt), nil
 	})
 }
 
@@ -310,7 +310,7 @@ func (*executionTreeVisitor) SSHClient(host, user, keyFile, password string, key
 		}
 		l.Println("connected to", host)
 
-		return context.WithValue(ctx, sshClientKey, s), nil
+		return context.WithValue(ctx, SshClientKey, s), nil
 	})
 }
 
@@ -323,9 +323,9 @@ func (*executionTreeVisitor) Forwarding(f *forwarding) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -346,9 +346,9 @@ func (*executionTreeVisitor) Tunnel(f *forwarding) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -373,14 +373,14 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -391,12 +391,12 @@ func (*executionTreeVisitor) Command(cmd *command) interface{} {
 			return nil, err
 		}
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		stdout, _ := ctx.Value(StdoutKey).(io.Writer)
 		if stdout == nil {
 			stdout = os.Stdout
 		}
 
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		stderr, _ := ctx.Value(StderrKey).(io.Writer)
 		if stderr == nil {
 			stderr = os.Stderr
 		}
@@ -415,9 +415,9 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -438,7 +438,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 
 		cmd := exec.CommandContext(ctx, exe, args...)
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		stdout, _ := ctx.Value(StdoutKey).(io.Writer)
 		if stdout == nil {
 			stdout = os.Stdout
 		}
@@ -446,7 +446,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 		defer stdout.(*bufio.Writer).Flush()
 		cmd.Stdout = stdout
 
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		stderr, _ := ctx.Value(StderrKey).(io.Writer)
 		if stderr == nil {
 			stderr = os.Stderr
 		}
@@ -467,7 +467,7 @@ func (*executionTreeVisitor) LocalCommand(cmd *command) interface{} {
 func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
-			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
+			return context.WithValue(ctx, StdoutKey, ioutil.Discard), nil
 		}
 
 		l, ok := ctx.Value(LoggerKey).(Logger)
@@ -477,9 +477,9 @@ func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -503,14 +503,14 @@ func (e *executionTreeVisitor) Stdout(o *output) interface{} {
 			f.Close()
 		}(ctx, f, path)
 
-		return context.WithValue(ctx, stdoutKey, f), nil
+		return context.WithValue(ctx, StdoutKey, f), nil
 	})
 }
 
 func (*executionTreeVisitor) Stderr(o *output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
-			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
+			return context.WithValue(ctx, StderrKey, ioutil.Discard), nil
 		}
 
 		l, ok := ctx.Value(LoggerKey).(Logger)
@@ -520,9 +520,9 @@ func (*executionTreeVisitor) Stderr(o *output) interface{} {
 			return nil, err
 		}
 
-		tt, ok := ctx.Value(templatingKey).(*templatingEngine)
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -547,6 +547,6 @@ func (*executionTreeVisitor) Stderr(o *output) interface{} {
 			f.Close()
 		}(ctx, f, path)
 
-		return context.WithValue(ctx, stderrKey, f), nil
+		return context.WithValue(ctx, StderrKey, f), nil
 	})
 }
