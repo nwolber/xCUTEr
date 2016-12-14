@@ -82,11 +82,8 @@ func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 			return context.WithValue(ctx, OutputKey, os.Stdout), nil
 		}
 
-<<<<<<< HEAD
-		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
-=======
-		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
->>>>>>> master
+		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
+
 		if !ok {
 			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
@@ -384,11 +381,8 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
-<<<<<<< HEAD
-		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
-=======
-		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
->>>>>>> master
+		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
+
 		if !ok {
 			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
@@ -425,11 +419,7 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 			return nil, err
 		}
 
-<<<<<<< HEAD
-		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
-=======
-		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
->>>>>>> master
+		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
@@ -491,11 +481,7 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 			return nil, err
 		}
 
-<<<<<<< HEAD
-		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
-=======
-		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
->>>>>>> master
+		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
@@ -538,11 +524,7 @@ func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 			return nil, err
 		}
 
-<<<<<<< HEAD
-		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
-=======
-		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
->>>>>>> master
+		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
 			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
