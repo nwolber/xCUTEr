@@ -230,7 +230,7 @@ func (t *stringBuilder) ContextBounds(nodeName string, child interface{}) interf
 
 func (t *stringBuilder) Retry(nodeName string, child interface{}, retries uint) interface{} {
 	if root := t.str.Retry(child, retries); root != nil {
-		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
+		return t.storeNode(nodeName, &visualizationNode{Branch: root.(job.Branch)})
 	}
 
 	return nil
