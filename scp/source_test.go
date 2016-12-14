@@ -158,7 +158,7 @@ func TestRecursiveTransfer(t *testing.T) {
 		},
 		files: []directory{
 			{
-				pathName: fileName + "/file1.txt",
+				pathName: filepath.Join(fileName, "file1.txt"),
 				info: &file{
 					name:  "file1.txt",
 					aTime: aTime,
@@ -169,7 +169,7 @@ func TestRecursiveTransfer(t *testing.T) {
 				contents: firstFileContents,
 			},
 			{
-				pathName: fileName + "/nestedDir",
+				pathName: filepath.Join(fileName, "nestedDir"),
 				info: &file{
 					name:  "nestedDir",
 					aTime: aTime,
@@ -179,7 +179,7 @@ func TestRecursiveTransfer(t *testing.T) {
 				},
 				files: []directory{
 					{
-						pathName: fileName + "/nestedDir/file2.txt",
+						pathName: filepath.Join(fileName, "/nestedDir/file2.txt"),
 						info: &file{
 							name:  "file2.txt",
 							aTime: aTime,
