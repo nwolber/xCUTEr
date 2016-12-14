@@ -66,7 +66,7 @@ func (v *Visualization) Apply(event Event) {
 	case EventFailed:
 		node.Status = StateFailed
 	case EventLog:
-		info := event.Info.(LogInfo)
+		info := event.Info
 		node.Append(job.Leaf(fmt.Sprintf("%s %s:%d: %s", event.Timestamp, info.File, info.Line, info.Message)))
 	}
 }
@@ -242,7 +242,7 @@ func (t *stringBuilder) Retry(nodeName string, child interface{}, retries uint) 
 
 func (t *stringBuilder) Templating(nodeName string, c *job.Config, h *job.Host) interface{} {
 	if root := t.str.Templating(c, h); root != nil {
-		t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
+		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
 	return nil
 }
