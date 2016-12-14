@@ -41,7 +41,7 @@ type Event struct {
 	Type      EventType
 	Timestamp time.Time
 	Name      string
-	Info      interface{}
+	Info      LogInfo
 }
 
 func StoreEvents(store *[]Event, events <-chan Event, done chan struct{}) {

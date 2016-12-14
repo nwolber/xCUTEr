@@ -49,10 +49,8 @@ func expectEvents(t *testing.T, name string, want, got []Event) bool {
 			t.Errorf("%s pos: %d, want type: %s, got: %s", name, i, wantEvent.Type, gotEvent.Type)
 		}
 
-		wantInfo, wantOk := wantEvent.Info.(LogInfo)
-		gotInfo, gotOk := gotEvent.Info.(LogInfo)
-		if wantOk && gotOk && wantInfo.Message != gotInfo.Message {
-			t.Errorf("%s pos: %d, want log message: '%s', got: '%s'", name, i, wantInfo.Message, gotInfo.Message)
+		if wantEvent.Info.Message != gotEvent.Info.Message {
+			t.Errorf("%s pos: %d, want log message: '%s', got: '%s'", name, i, wantEvent.Info.Message, gotEvent.Info.Message)
 		}
 	}
 
