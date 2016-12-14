@@ -72,19 +72,23 @@ func (e *ExecutionTreeBuilder) Job(name string) Group {
 
 func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, _ := ctx.Value(outputKey).(io.Writer)
+		output, _ := ctx.Value(OutputKey).(io.Writer)
 
 		if output != nil {
 			return ctx, nil
 		}
 
 		if o == nil {
-			return context.WithValue(ctx, outputKey, os.Stdout), nil
+			return context.WithValue(ctx, OutputKey, os.Stdout), nil
 		}
 
+<<<<<<< HEAD
 		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
+=======
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
+>>>>>>> master
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -109,10 +113,10 @@ func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 		}(ctx, f)
 
 		if output != nil {
-			return context.WithValue(ctx, outputKey, io.MultiWriter(f, output)), nil
+			return context.WithValue(ctx, OutputKey, io.MultiWriter(f, output)), nil
 		}
 
-		return context.WithValue(ctx, outputKey, f), nil
+		return context.WithValue(ctx, OutputKey, f), nil
 	})
 }
 
@@ -141,9 +145,9 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 
 func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, ok := ctx.Value(outputKey).(io.Writer)
+		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", outputKey)
+			err := fmt.Errorf("no %s available", OutputKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -154,9 +158,9 @@ func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 
 func (e *ExecutionTreeBuilder) HostLogger(jobName string, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		output, ok := ctx.Value(outputKey).(io.Writer)
+		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", outputKey)
+			err := fmt.Errorf("no %s available", OutputKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -291,7 +295,7 @@ func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{
 func (e *ExecutionTreeBuilder) Templating(c *Config, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		tt := newTemplatingEngine(c, h)
-		return context.WithValue(ctx, templatingKey, tt), nil
+		return context.WithValue(ctx, TemplatingKey, tt), nil
 	})
 }
 
@@ -312,7 +316,7 @@ func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, key
 		}
 		l.Println("connected to", host)
 
-		return context.WithValue(ctx, sshClientKey, s), nil
+		return context.WithValue(ctx, SshClientKey, s), nil
 	})
 }
 
@@ -325,9 +329,9 @@ func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -348,9 +352,9 @@ func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -375,14 +379,18 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 			return nil, err
 		}
 
-		s, ok := ctx.Value(sshClientKey).(*sshClient)
+		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", sshClientKey)
+			return nil, fmt.Errorf("no %s available", SshClientKey)
 		}
 
+<<<<<<< HEAD
 		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
+=======
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
+>>>>>>> master
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -393,12 +401,12 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 			return nil, err
 		}
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		stdout, _ := ctx.Value(StdoutKey).(io.Writer)
 		if stdout == nil {
 			stdout = os.Stdout
 		}
 
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		stderr, _ := ctx.Value(StderrKey).(io.Writer)
 		if stderr == nil {
 			stderr = os.Stderr
 		}
@@ -417,9 +425,13 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 			return nil, err
 		}
 
+<<<<<<< HEAD
 		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
+=======
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
+>>>>>>> master
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -440,7 +452,7 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 
 		cmd := exec.CommandContext(ctx, exe, args...)
 
-		stdout, _ := ctx.Value(stdoutKey).(io.Writer)
+		stdout, _ := ctx.Value(StdoutKey).(io.Writer)
 		if stdout == nil {
 			stdout = os.Stdout
 		}
@@ -448,7 +460,7 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 		defer stdout.(*bufio.Writer).Flush()
 		cmd.Stdout = stdout
 
-		stderr, _ := ctx.Value(stderrKey).(io.Writer)
+		stderr, _ := ctx.Value(StderrKey).(io.Writer)
 		if stderr == nil {
 			stderr = os.Stderr
 		}
@@ -469,7 +481,7 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
-			return context.WithValue(ctx, stdoutKey, ioutil.Discard), nil
+			return context.WithValue(ctx, StdoutKey, ioutil.Discard), nil
 		}
 
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -479,9 +491,13 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 			return nil, err
 		}
 
+<<<<<<< HEAD
 		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
+=======
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
+>>>>>>> master
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -505,14 +521,14 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 			f.Close()
 		}(ctx, f, path)
 
-		return context.WithValue(ctx, stdoutKey, f), nil
+		return context.WithValue(ctx, StdoutKey, f), nil
 	})
 }
 
 func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
-			return context.WithValue(ctx, stderrKey, ioutil.Discard), nil
+			return context.WithValue(ctx, StderrKey, ioutil.Discard), nil
 		}
 
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -522,9 +538,13 @@ func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 			return nil, err
 		}
 
+<<<<<<< HEAD
 		tt, ok := ctx.Value(templatingKey).(*TemplatingEngine)
+=======
+		tt, ok := ctx.Value(TemplatingKey).(*templatingEngine)
+>>>>>>> master
 		if !ok {
-			err := fmt.Errorf("no %s available", templatingKey)
+			err := fmt.Errorf("no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -549,6 +569,6 @@ func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 			f.Close()
 		}(ctx, f, path)
 
-		return context.WithValue(ctx, stderrKey, f), nil
+		return context.WithValue(ctx, StderrKey, f), nil
 	})
 }

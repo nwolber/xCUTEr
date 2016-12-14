@@ -32,6 +32,7 @@ func (w *watcher) watch(ctx context.Context, events chan<- fsnotify.Event) {
 
 	fsWatcher.Add(w.path)
 
+	// generate an event for every existing file
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".job") {
 			events <- fsnotify.Event{
