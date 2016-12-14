@@ -23,10 +23,6 @@ type jobInfo struct {
 	c    *job.Config
 }
 
-// func (info *jobInfo) Config() *job.Config {
-// 	return info.c
-// }
-
 type schedInfo struct {
 	id string
 	j  *jobInfo
@@ -36,26 +32,36 @@ func (info *schedInfo) Config() *job.Config {
 	return info.j.c
 }
 
+// runInfo holds information about a single run of a job.
 type runInfo struct {
-	e           *executor
-	j           *jobInfo
-	cancel      context.CancelFunc
+	// The executor the job runs on.
+	e *executor
+	// jobInfo about the running job.
+	j *jobInfo
+	// Function to cancel the job early.
+	cancel context.CancelFunc
+	// Start and finish time of the job.
 	start, stop time.Time
-	output      bytes.Buffer
+	// Job output.
+	output bytes.Buffer
 }
 
+// Config returns the running Config .
 func (info *runInfo) Config() *job.Config {
 	return info.j.c
 }
 
+// Start time.
 func (info *runInfo) Start() time.Time {
 	return info.start
 }
 
+// Finish time.
 func (info *runInfo) Stop() time.Time {
 	return info.stop
 }
 
+// Job output.
 func (info *runInfo) Output() string {
 	return info.output.String()
 }
@@ -89,23 +95,34 @@ func (info *runInfo) run() {
 }
 
 type executor struct {
-	mainCtx      context.Context
+	// The main context used to cancel all jobs at once.
+	mainCtx context.Context
+	// Whether jobs need to be activated manually.
 	manualActive bool
+	// Number of completed runInfos kept.
 	maxCompleted uint32
-	Start, Stop  func()
-	run          func(info *runInfo)
-	schedule     func(schedule string, f func()) (string, error)
-	remove       func(string)
+	// Functions to start and stop the scheduler.
+	Start, Stop func()
+	// Function to run a runInfo.
+	run func(info *runInfo)
+	// Function to schedule a new runInfo.
+	schedule func(schedule string, f func()) (string, error)
+	// Function to remove an existing runInfo.
+	remove func(string)
 
+	// List of inactive scheduled jobs. Only used if manualActive is true.
 	inactive  map[string]*schedInfo
 	mInactive sync.Mutex
 
+	// List of scheduled jobs.
 	scheduled map[string]*schedInfo
 	mSched    sync.Mutex
 
+	// List of currently running jobs.
 	running map[string]*runInfo
 	mRun    sync.Mutex
 
+	// List of completed runInfos. A maximum of maxCompleted runInfos is kept.
 	completed  []*runInfo
 	mCompleted sync.Mutex
 }
@@ -128,6 +145,7 @@ func newExecutor(ctx context.Context) *executor {
 	}
 }
 
+// parse parses the given file and stores the execution tree in the jobInfo.
 func parse(file string) (*jobInfo, error) {
 	c, err := job.ReadConfig(file)
 	if err != nil {
@@ -150,6 +168,8 @@ func parse(file string) (*jobInfo, error) {
 	}, nil
 }
 
+// scheduleBody returns a function that can be used by the cron
+// scheduler to execute the Job.
 func scheduleBody(e *executor, j *jobInfo) func() {
 	return func() {
 		log.Println(j.c.Name, "woke up")
@@ -162,6 +182,9 @@ func scheduleBody(e *executor, j *jobInfo) func() {
 	}
 }
 
+// Run either executes the job directly if either the job's schedule
+// is "once" or the once parameter is true. Otherwise the job is
+// scheduled as if Add would have been called.
 func (e *executor) Run(j *jobInfo, once bool) {
 	if j.c.Schedule == "once" || once {
 		info := &runInfo{
@@ -207,6 +230,7 @@ func (e *executor) Add(j *jobInfo) error {
 	return nil
 }
 
+// Remove removes all resources associated with the given job file.
 func (e *executor) Remove(file string) {
 	log.Println("remove", file)
 	if info := e.isRunning(file); info != nil {
@@ -228,6 +252,7 @@ func (e *executor) Remove(file string) {
 	}
 }
 
+// Activates the job associated with the job file.
 func (e *executor) Activate(file string) {
 	log.Println("activate", file)
 	if info := e.isInactive(file); info != nil {
@@ -240,6 +265,7 @@ func (e *executor) Activate(file string) {
 	}
 }
 
+// Deactivates the job associated with the job file.
 func (e *executor) Deactivate(file string) {
 	log.Println("deactivate", file)
 
@@ -293,8 +319,6 @@ func (e *executor) GetRunning() []*runInfo {
 	}
 	return running
 }
-
-// func (e*executor)
 
 func (e *executor) addComplete(info *runInfo) {
 	e.mCompleted.Lock()
