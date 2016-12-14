@@ -5,7 +5,7 @@
 package telemetry
 
 import (
-	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nwolber/xCUTEr/flunc"
@@ -13,7 +13,7 @@ import (
 )
 
 type nodeGroup struct {
-	events chan<- Event
+	events *EventStore
 	name   string
 	group  job.Group
 }
@@ -28,21 +28,41 @@ func (n *nodeGroup) Wrap() interface{} {
 	return instrument(n.name, n.group.Wrap().(flunc.Flunc), n.events)
 }
 
+// An EventStore stores Events.
+type EventStore struct {
+	m      sync.Mutex
+	events []Event
+}
+
+func (e *EventStore) store(event Event) {
+	e.m.Lock()
+	defer e.m.Unlock()
+	e.events = append(e.events, event)
+}
+
+// Get returns a copy of all Events in the store.
+func (e *EventStore) Get() []Event {
+	e.m.Lock()
+	defer e.m.Unlock()
+	events := e.events
+	return events
+}
+
 type telemetryBuilder struct {
-	events chan<- Event
+	events *EventStore
 	exec   *job.ExecutionTreeBuilder
 }
 
 // NewBuilder returns a ConfigBuilder that instruments the
 // execution tree for gathering telemetry information.
-func NewBuilder(events chan<- Event) job.ConfigBuilder {
-	fmt.Println(events)
+func NewBuilder() (job.ConfigBuilder, *EventStore) {
+	events := &EventStore{}
 	return &NamingBuilder{
 		NamedConfigBuilder: &telemetryBuilder{
 			events: events,
 			exec:   &job.ExecutionTreeBuilder{},
 		},
-	}
+	}, events
 }
 
 func (t *telemetryBuilder) Sequential(nodeName string) job.Group {

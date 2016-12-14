@@ -122,21 +122,16 @@ func TestInstrument(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var got []Event
-		events := make(chan Event)
-		done := make(chan struct{})
-		go StoreEvents(&got, events, done)
+		events := &EventStore{}
 
 		f := instrument(test.name, test.f, events)
 
-		expectEvents(t, test.name, []Event{}, got)
+		expectEvents(t, test.name, []Event{}, events.events)
 
 		_, err := f(context.TODO())
-		close(events)
-		<-done
 
 		expect(t, test.name, test.err, err)
-		expectEvents(t, test.name, test.want, got)
+		expectEvents(t, test.name, test.want, events.events)
 	}
 }
 
@@ -155,10 +150,7 @@ func TestInstrumentWithAlteredContext(t *testing.T) {
 		return context.WithValue(ctx, key, value), nil
 	})
 
-	events := make(chan Event)
-	go discardEvents(events)
-
-	f := instrument("bla", alteringFlunc, events)
+	f := instrument("bla", alteringFlunc, &EventStore{})
 	ctx := context.Background()
 	returnedCtx, err := f(ctx)
 	expect(t, "returned value", value, returnedCtx.Value(key))

@@ -27,34 +27,27 @@ func main() {
 		log.Fatalln(file, err)
 	}
 
-	events := make(chan telemetry.Event)
-	builder := telemetry.NewBuilder(events)
+	builder, store := telemetry.NewBuilder()
 	f, err := job.VisitConfig(builder, config)
 	if err != nil {
 		log.Fatalln("error instrumenting execution tree:", err)
 	}
 
-	var store []telemetry.Event
-	done := make(chan struct{})
-
-	go telemetry.StoreEvents(&store, events, done)
 	f.(flunc.Flunc)(context.TODO())
 	// <-time.After(time.Second)
-	close(events)
-	<-done
 
 	tree, err := telemetry.NewVisualization(config)
 	if err != nil {
 		log.Fatalln("error building visualization tree:", err)
 	}
-	tree.ApplyStore(store)
+	tree.ApplyStore(store.Get())
 	fmt.Println(tree)
 
 	timing, err := telemetry.NewTiming(config)
 	if err != nil {
 		log.Fatalln("error building timing tree:", err)
 	}
-	timing.ApplyStore(store)
+	timing.ApplyStore(store.Get())
 
 	fmt.Printf("Total runtime: %s\n", timing.JobRuntime)
 	for name, timings := range timing.Hosts {

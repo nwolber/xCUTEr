@@ -53,7 +53,7 @@ func StoreEvents(store *[]Event, events <-chan Event, done chan struct{}) {
 	}
 }
 
-func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
+func instrument(name string, f flunc.Flunc, events *EventStore) flunc.Flunc {
 	if name == "" {
 		log.Panicln("name may not be empty")
 	}
@@ -75,27 +75,27 @@ func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
 
 		telemetryContext := context.WithValue(ctx, job.LoggerKey, &logger)
 
-		events <- Event{
+		events.store(Event{
 			Timestamp: time.Now(),
 			Type:      EventStart,
 			Name:      name,
-		}
+		})
 
 		newCtx, err := f(telemetryContext)
 		stop := time.Now()
 
 		if err != nil {
-			events <- Event{
+			events.store(Event{
 				Timestamp: stop,
 				Type:      EventFailed,
 				Name:      name,
-			}
+			})
 		} else {
-			events <- Event{
+			events.store(Event{
 				Timestamp: stop,
 				Type:      EventEnd,
 				Name:      name,
-			}
+			})
 		}
 
 		return newCtx, err

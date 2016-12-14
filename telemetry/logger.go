@@ -22,7 +22,7 @@ type LogInfo struct {
 type telemetryLogger struct {
 	orig   logger.Logger
 	name   string
-	events chan<- Event
+	events *EventStore
 }
 
 var (
@@ -39,7 +39,7 @@ func (l *telemetryLogger) Log(t time.Time, message string) {
 		message = message[:l-1]
 	}
 
-	l.events <- Event{
+	l.events.store(Event{
 		Timestamp: t,
 		Type:      EventLog,
 		Name:      l.name,
@@ -48,7 +48,7 @@ func (l *telemetryLogger) Log(t time.Time, message string) {
 			Line:    line,
 			Message: message,
 		},
-	}
+	})
 }
 
 func (l *telemetryLogger) SetOutput(w io.Writer) {
