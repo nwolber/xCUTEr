@@ -32,7 +32,7 @@ const (
 )
 
 // New creates a new xCUTEr with the given config options.
-func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string, once, quiet bool) (*XCUTEr, error) {
+func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, telemetryEndpoint string, once, quiet bool) (*XCUTEr, error) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 
 	if logFile != "" && !quiet {
@@ -55,7 +55,12 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string
 	job.InitializeSSHClientStore(sshTTL)
 	job.KeepAliveInterval = sshKeepAlive
 
-	e := newExecutor(mainCtx)
+	e, err := newExecutor(mainCtx, telemetryEndpoint)
+	if err != nil {
+		mainCancel()
+		return nil, err
+	}
+
 	e.Start()
 
 	// do we run only a single job file?

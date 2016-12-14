@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestAddOnce(t *testing.T) {
-	e := newExecutor(context.TODO())
+	e, _ := newExecutor(context.TODO(), "")
 	done := make(chan struct{})
 	e.run = func(info *runInfo) {
 		if info == nil {
@@ -63,7 +63,7 @@ func TestAddOnce(t *testing.T) {
 }
 
 func TestRunOnce(t *testing.T) {
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 
 	wait := make(chan struct{})
 	done := make(chan struct{})
@@ -96,7 +96,7 @@ func TestRunOnce(t *testing.T) {
 }
 
 func TestRunTwice(t *testing.T) {
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 
 	wait := make(chan struct{})
 	done := make(chan struct{})
@@ -144,7 +144,7 @@ func TestRunTwice(t *testing.T) {
 }
 
 func TestMaxCompleted(t *testing.T) {
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	want := 2
 	e.maxCompleted = uint32(want)
 
@@ -178,7 +178,7 @@ func TestAddSchedule(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.schedule = func(schedule string, f func()) (string, error) {
 		go func() {
 			<-waitBeforeWake
@@ -231,7 +231,7 @@ func TestAddScheduleError(t *testing.T) {
 		file = "test.job"
 	)
 
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.schedule = func(schedule string, f func()) (string, error) {
 		return "", errors.New("test error")
 	}
@@ -255,7 +255,7 @@ func TestRemoveBeforeWake(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.schedule = func(schedule string, f func()) (string, error) {
 		go func() {
 			<-waitBeforeWake
@@ -284,7 +284,7 @@ func TestRemoveWhileRunning(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.schedule = func(schedule string, f func()) (string, error) {
 		go func() {
 			<-waitBeforeWake
@@ -329,7 +329,7 @@ func TestRemoveAfterDone(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.schedule = func(schedule string, f func()) (string, error) {
 		go func() {
 			<-waitBeforeWake
@@ -384,7 +384,7 @@ func TestAddInactive(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.manualActive = true
 	e.schedule = func(schedule string, f func()) (string, error) {
 		<-waitBeforeWake
@@ -408,7 +408,7 @@ func TestRemoveInactive(t *testing.T) {
 	)
 
 	waitBeforeWake := make(chan struct{})
-	e := newExecutor(context.Background())
+	e, _ := newExecutor(context.TODO(), "")
 	e.manualActive = true
 	e.schedule = func(schedule string, f func()) (string, error) {
 		<-waitBeforeWake

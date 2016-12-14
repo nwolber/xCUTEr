@@ -11,16 +11,17 @@ import (
 	"time"
 )
 
-func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, perf string, once, quiet bool) {
+func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, telemetryEndpoint, perf string, once, quiet bool) {
 	const (
-		jobDirDefault       = "."
-		sshTTLDefault       = time.Minute * 10
-		sshKeepAliveDefault = time.Second * 30
-		logFileDefault      = ""
-		defaultPerf         = ""
-		fileDefault         = ""
-		onceDefault         = false
-		quietDefault        = false
+		jobDirDefault            = "."
+		sshTTLDefault            = time.Minute * 10
+		sshKeepAliveDefault      = time.Second * 30
+		logFileDefault           = ""
+		telemetryEndpointDefault = ""
+		defaultPerf              = ""
+		fileDefault              = ""
+		onceDefault              = false
+		quietDefault             = false
 	)
 
 	flag.StringVar(&jobDir, "jobs", jobDirDefault, "Directory to watch for .job files.")
@@ -29,8 +30,9 @@ func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile,
 	flag.StringVar(&file, "file", fileDefault, "Job file to execute. Disables automatic pick-up of job files.")
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
 	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turning off log messages. Command output is still printed. Overwrites -log.")
-	flag.StringVar(&logFile, "log", logFileDefault, "Log file")
-	flag.StringVar(&perf, "perf", defaultPerf, "Perf endpoint")
+	flag.StringVar(&logFile, "log", logFileDefault, "Log file.")
+	flag.StringVar(&telemetryEndpoint, "statsd", telemetryEndpointDefault, "UDP endpoint for statsd messages.")
+	flag.StringVar(&perf, "perf", defaultPerf, "Perf endpoint.")
 
 	help := flag.Bool("help", false, "Display this help")
 	config := flag.Bool("config", false, "Display current configuration")

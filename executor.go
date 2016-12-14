@@ -7,11 +7,13 @@ package xCUTEr
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-go/statsd"
 	sched "github.com/nwolber/cron"
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
@@ -91,7 +93,12 @@ func (info *runInfo) run() {
 		// release resources
 		cancel()
 		info.stop = time.Now()
-		info.j.events.Reset()
+
+		if info.j.telemetry {
+			events := info.j.events.Reset()
+			info.e.sendTelemetry(info.j.c, &events)
+		}
+
 		info.e.removeRunning(info)
 		info.e.addComplete(info)
 	}()
@@ -130,12 +137,28 @@ type executor struct {
 	// List of completed runInfos. A maximum of maxCompleted runInfos is kept.
 	completed  []*runInfo
 	mCompleted sync.Mutex
+
+	statsdClient *statsd.Client
 }
 
-func newExecutor(ctx context.Context) *executor {
+func newExecutor(ctx context.Context, telemetryEndpoint string) (*executor, error) {
 	run := func(info *runInfo) { info.run() }
 
 	cron := sched.New()
+
+	if telemetryEndpoint != "" {
+		statsdClient, err := statsd.New(telemetryEndpoint)
+		if err != nil {
+			return nil, err
+		}
+
+		statsdClient.Namespace = "xCUTEr"
+		go func(client *statsd.Client) {
+			<-ctx.Done()
+			client.Close()
+		}(statsdClient)
+	}
+
 	return &executor{
 		mainCtx:      ctx,
 		maxCompleted: 10,
@@ -147,6 +170,22 @@ func newExecutor(ctx context.Context) *executor {
 		inactive:     make(map[string]*schedInfo),
 		scheduled:    make(map[string]*schedInfo),
 		running:      make(map[string]*runInfo),
+	}, nil
+}
+
+func (e *executor) sendTelemetry(c *job.Config, events *[]telemetry.Event) {
+	timing, err := telemetry.NewTiming(c)
+	if err != nil {
+		log.Println("Error creating timing:", err)
+		return
+	}
+
+	timing.ApplyStore(*events)
+
+	e.statsdClient.Timing(c.Name+".runtime", timing.JobRuntime, nil, 1.0)
+
+	for host, stats := range timing.Hosts {
+		e.statsdClient.Timing(fmt.Sprintf("%s.%s.runtime", c.Name, host.Name), stats.Runtime, nil, 1.0)
 	}
 }
 
@@ -164,6 +203,7 @@ func parse(file string) (*jobInfo, error) {
 		f      flunc.Flunc
 		events *telemetry.EventStore
 	)
+
 	if useTelemetry {
 		f, events, err = telemetry.Instrument(c)
 	} else {

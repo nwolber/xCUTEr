@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	jobDir, sshTTL, sshKeepAlive, file, logFile, perf, once, quiet := config()
+	jobDir, sshTTL, sshKeepAlive, file, logFile, telemetryEndpoint, perf, once, quiet := config()
 
 	if perf != "" {
 		go func() {
@@ -29,7 +29,7 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 
-	x, err := xCUTEr.New(jobDir, sshTTL, sshKeepAlive, file, logFile, once, quiet)
+	x, err := xCUTEr.New(jobDir, sshTTL, sshKeepAlive, file, logFile, telemetryEndpoint, once, quiet)
 	if err != nil {
 		log.Fatalln(err)
 	}
