@@ -15,12 +15,16 @@ import (
 	sched "github.com/nwolber/cron"
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
+	"github.com/nwolber/xCUTEr/telemetry"
 )
 
 type jobInfo struct {
 	file string
 	f    flunc.Flunc
 	c    *job.Config
+
+	telemetry bool
+	events    *telemetry.EventStore
 }
 
 type schedInfo struct {
@@ -152,8 +156,19 @@ func parse(file string) (*jobInfo, error) {
 		return nil, err
 	}
 
+	useTelemetry := c.Telemetry
+
 	start := time.Now()
-	f, err := c.ExecutionTree()
+	var (
+		f      flunc.Flunc
+		events *telemetry.EventStore
+	)
+	if useTelemetry {
+		f, events, err = telemetry.Instrument(c)
+	} else {
+		f, err = c.ExecutionTree()
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +180,9 @@ func parse(file string) (*jobInfo, error) {
 		file: file,
 		c:    c,
 		f:    f,
+
+		telemetry: useTelemetry,
+		events:    events,
 	}, nil
 }
 

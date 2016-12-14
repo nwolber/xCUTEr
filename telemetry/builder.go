@@ -63,6 +63,12 @@ type telemetryBuilder struct {
 	exec   *job.ExecutionTreeBuilder
 }
 
+func Instrument(c *job.Config) (flunc.Flunc, *EventStore, error) {
+	builder, events := NewBuilder()
+	f, err := job.VisitConfig(builder, c)
+	return f.(flunc.Flunc), events, err
+}
+
 // NewBuilder returns a ConfigBuilder that instruments the
 // execution tree for gathering telemetry information.
 // It also returns an EventStore that gets populated with
