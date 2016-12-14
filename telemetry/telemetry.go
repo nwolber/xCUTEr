@@ -74,7 +74,6 @@ func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
 		}
 
 		telemetryContext := context.WithValue(ctx, job.LoggerKey, &logger)
-		interceptContext := &interceptContext{Context: telemetryContext}
 
 		events <- Event{
 			Timestamp: time.Now(),
@@ -82,7 +81,7 @@ func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
 			Name:      name,
 		}
 
-		newCtx, err := f(interceptContext)
+		newCtx, err := f(telemetryContext)
 		stop := time.Now()
 
 		if err != nil {
@@ -99,21 +98,9 @@ func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
 			}
 		}
 
-		// retarget the interceptContext to remove any instrumentation from the context
-		interceptContext.Context = ctx
-
 		return newCtx, err
 	})
 }
-
-type interceptContext struct {
-	context.Context
-}
-
-func (ctx *interceptContext) Deadline() (deadline time.Time, ok bool) { return ctx.Context.Deadline() }
-func (ctx *interceptContext) Done() <-chan struct{}                   { return ctx.Context.Done() }
-func (ctx *interceptContext) Err() error                              { return ctx.Context.Err() }
-func (ctx *interceptContext) Value(key interface{}) interface{}       { return ctx.Context.Value(key) }
 
 func findOriginalLogger(ctx context.Context) logger.Logger {
 	origLogger, ok := ctx.Value(job.LoggerKey).(logger.Logger)

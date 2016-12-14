@@ -162,7 +162,9 @@ func TestInstrumentWithAlteredContext(t *testing.T) {
 	ctx := context.Background()
 	returnedCtx, err := f(ctx)
 	expect(t, "returned value", value, returnedCtx.Value(key))
-	expect(t, "logger", nil, returnedCtx.Value(job.LoggerKey))
+	if returnedCtx.Value(job.LoggerKey) == nil {
+		t.Error("want a logger, got nil")
+	}
 	expect(t, "error", nil, err)
 
 }

@@ -82,6 +82,11 @@ func waitConn(client *ssh.Client) chan error {
 }
 
 func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+	l, ok := ctx.Value(LoggerKey).(logger.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
 	key := fmt.Sprintf("%s@%s", user, addr)
 
 	// lock store only briefly while finding out if there is an existing client
@@ -95,7 +100,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 	}()
 
 	if !ok {
-		client, err := createClient(addr, user, keyFile, password, keyboardInteractive)
+		client, err := createClient(ctx, addr, user, keyFile, password, keyboardInteractive)
 		if err != nil {
 			return nil, err
 		}
@@ -109,18 +114,18 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			for {
 				select {
 				case <-keepAliveTimer.C:
-					log.Println("sending keep-alive request to", key)
+					l.Println("sending keep-alive request to", key)
 					_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
 					if err != nil {
-						log.Println("keep-alive to", key, "failed:", err)
+						l.Println("keep-alive to", key, "failed:", err)
 						continue
 					}
-					log.Println("keep-alive to", key, "successful")
+					l.Println("keep-alive to", key, "successful")
 				case err := <-connClosed:
 					if err != nil {
-						log.Println("connection to", key, "closed, removing from store:", err)
+						l.Println("connection to", key, "closed, removing from store:", err)
 					} else {
-						log.Println("conntection to", key, "closed without error, removing from store")
+						l.Println("conntection to", key, "closed without error, removing from store")
 					}
 					break loop
 				}
@@ -145,12 +150,12 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		store.m.Lock()
 		defer store.m.Unlock()
 
-		log.Println("reusing existing connection to", key)
+		l.Println("reusing existing connection to", key)
 	}
 
 	elem.ref++
 	elem.lastUsed = time.Now()
-	log.Println("incrementing ref counter for", key, "new value:", elem.ref)
+	l.Println("incrementing ref counter for", key, "new value:", elem.ref)
 
 	go func(ctx context.Context, client *sshClient) {
 		<-ctx.Done()
@@ -161,9 +166,9 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 		if ok {
 			elem.ref--
 			elem.lastUsed = time.Now()
-			log.Println("context done, decrementing ref counter for", key, "new value:", elem.ref)
+			l.Println("context done, decrementing ref counter for", key, "new value:", elem.ref)
 		} else {
-			log.Println("context done, connection to", key, "doesn't exist anymore")
+			l.Println("context done, connection to", key, "doesn't exist anymore")
 		}
 	}(ctx, elem.client)
 
@@ -175,7 +180,12 @@ type sshClient struct {
 	trashed chan struct{}
 }
 
-var createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+var createClient = func(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+	l, ok := ctx.Value(LoggerKey).(logger.Logger)
+	if !ok || l == nil {
+		l = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{},
@@ -185,14 +195,14 @@ var createClient = func(addr, user, keyFile, password string, keyboardInteractiv
 		s, _, err := readPrivateKeyFile(keyFile, nil)
 		if err != nil {
 			err = fmt.Errorf("Unable to read private key %s", err)
-			log.Println(err)
+			l.Println(err)
 			return nil, err
 		}
 
 		signer, err := ssh.NewSignerFromSigner(s)
 		if err != nil {
 			err = fmt.Errorf("Unable to turn signer into signer %s", err)
-			log.Println(err)
+			l.Println(err)
 			return nil, err
 		}
 		config.Auth = append(config.Auth, ssh.PublicKeys(signer))
@@ -206,13 +216,13 @@ var createClient = func(addr, user, keyFile, password string, keyboardInteractiv
 		config.Auth = append(config.Auth, ssh.KeyboardInteractive(keyboardInteractiveChallenge(user, keyboardInteractive)))
 	}
 
-	log.Println("no existing connection, connecting to", addr)
+	l.Println("no existing connection, connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("connected to", addr)
+	l.Println("connected to", addr)
 	return &sshClient{
 		c:       client,
 		trashed: make(chan struct{}),

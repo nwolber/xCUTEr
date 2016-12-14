@@ -64,7 +64,7 @@ func TestCreateClient(t *testing.T) {
 	}
 	defer s.Close()
 
-	client, err := createClient(s.listener.Addr().String(), user, "", "", map[string]string{
+	client, err := createClient(context.Background(), s.listener.Addr().String(), user, "", "", map[string]string{
 		question: answer,
 	})
 	if client == nil {
@@ -226,7 +226,7 @@ func TestConnectionTimeout(t *testing.T) {
 		createClient = origCreateClient
 	}()
 
-	createClient = func(addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
+	createClient = func(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 		return &sshClient{
 			c:       &ssh.Client{Conn: conn},
 			trashed: make(chan struct{}),
