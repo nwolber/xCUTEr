@@ -29,19 +29,6 @@ var (
 	calldepth = 2
 )
 
-func (l *telemetryLogger) log(timestamp time.Time, file string, line int, message string) {
-	l.events <- Event{
-		Timestamp: timestamp,
-		Type:      EventLog,
-		Name:      l.name,
-		Info: LogInfo{
-			File:    file,
-			Line:    line,
-			Message: message,
-		},
-	}
-}
-
 func (l *telemetryLogger) Log(t time.Time, message string) {
 	_, file, line, ok := runtime.Caller(2)
 	if !ok {
@@ -52,7 +39,16 @@ func (l *telemetryLogger) Log(t time.Time, message string) {
 		message = message[:l-1]
 	}
 
-	l.log(t, file, line, message)
+	l.events <- Event{
+		Timestamp: t,
+		Type:      EventLog,
+		Name:      l.name,
+		Info: LogInfo{
+			File:    file,
+			Line:    line,
+			Message: message,
+		},
+	}
 }
 
 func (l *telemetryLogger) SetOutput(w io.Writer) {
