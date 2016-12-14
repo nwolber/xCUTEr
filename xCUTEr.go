@@ -105,6 +105,8 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string
 						}
 						e.Add(j)
 					}
+				case <-mainCtx.Done():
+					return
 				}
 			}
 		}()
