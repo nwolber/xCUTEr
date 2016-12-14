@@ -6,6 +6,7 @@ package telemetry
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/nwolber/xCUTEr/flunc"
@@ -53,12 +54,16 @@ func StoreEvents(store *[]Event, events <-chan Event, done chan struct{}) {
 }
 
 func instrument(name string, f flunc.Flunc, events chan<- Event) flunc.Flunc {
+	if name == "" {
+		log.Panicln("name may not be empty")
+	}
+
 	if f == nil {
-		panic("f may not be nil")
+		log.Panicln("f may not be nil")
 	}
 
 	if events == nil {
-		panic("events may not be nil")
+		log.Panicln("events may not be nil")
 	}
 
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
