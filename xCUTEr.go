@@ -58,6 +58,7 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string
 	e := newExecutor(mainCtx)
 	e.Start()
 
+	// do we run only a single job file?
 	if file != "" {
 		j, err := parse(file)
 		if err != nil {
@@ -72,16 +73,17 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile string
 			}
 		}()
 	} else {
-		events := make(chan fsnotify.Event)
+		fsEvents := make(chan fsnotify.Event)
 		w := &watcher{
 			path: jobDir,
 		}
-		go w.watch(mainCtx, events)
+		go w.watch(mainCtx, fsEvents)
 
+		// main event loop
 		go func() {
 			for {
 				select {
-				case event := <-events:
+				case event := <-fsEvents:
 					if event.Op&fsnotify.Create == fsnotify.Create {
 						j, err := parse(event.Name)
 						if err != nil {
