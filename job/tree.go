@@ -11,7 +11,7 @@ import (
 )
 
 type Vars struct {
-	tt *TemplatingEngine
+	Te *TemplatingEngine
 }
 
 type Stringer interface {
@@ -25,8 +25,8 @@ type Leaf string
 
 func (s Leaf) String(v *Vars) string {
 	str := string(s)
-	if v != nil && v.tt != nil {
-		newStr, err := v.tt.Interpolate(str)
+	if v != nil && v.Te != nil {
+		newStr, err := v.Te.Interpolate(str)
 		if err == nil {
 			str = newStr
 		} else {
@@ -69,7 +69,7 @@ func (s *SimpleBranch) Wrap() interface{} {
 }
 
 func (s *SimpleBranch) String(v *Vars) string {
-	str := string(s.Root)
+	str := s.Root.String(v)
 	l := len(s.Leafs)
 
 	if l <= 0 {

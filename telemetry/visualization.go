@@ -16,8 +16,9 @@ import (
 // Visualization shows the execution tree of a job
 // in a specific state.
 type Visualization struct {
-	root  *visualizationNode
-	nodes map[string]*visualizationNode
+	config *job.Config
+	root   *visualizationNode
+	nodes  map[string]*visualizationNode
 }
 
 // NewVisualization generates a new Visualization from the given config.
@@ -29,8 +30,9 @@ func NewVisualization(c *job.Config) (*Visualization, error) {
 	}
 
 	return &Visualization{
-		root:  tree.(*visualizationNode),
-		nodes: builder.(*NamingBuilder).NamedConfigBuilder.(*stringBuilder).nodes,
+		config: c,
+		root:   tree.(*visualizationNode),
+		nodes:  builder.(*NamingBuilder).NamedConfigBuilder.(*stringBuilder).nodes,
 	}, nil
 }
 
@@ -70,7 +72,11 @@ func (v *Visualization) Apply(event Event) {
 }
 
 func (v *Visualization) String() string {
-	return v.root.String(&job.Vars{})
+	return v.root.String(&job.Vars{
+		Te: &job.TemplatingEngine{
+			Config: v.config,
+		},
+	})
 }
 
 // NodeStatus describes the status of a node.
@@ -145,7 +151,7 @@ func (t *stringBuilder) storeNode(nodeName string, node *visualizationNode) *vis
 func newStringBuilder() job.ConfigBuilder {
 	return &NamingBuilder{
 		NamedConfigBuilder: &stringBuilder{
-			str:   &job.StringBuilder{Full: true},
+			str:   &job.StringBuilder{Full: false},
 			nodes: make(map[string]*visualizationNode),
 		},
 	}
@@ -167,7 +173,6 @@ func (t *stringBuilder) Output(nodeName string, o *job.Output) interface{} {
 	if root := t.str.Output(o); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -175,7 +180,6 @@ func (t *stringBuilder) JobLogger(nodeName string, jobName string) interface{} {
 	if root := t.str.JobLogger(jobName); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -184,7 +188,6 @@ func (t *stringBuilder) HostLogger(nodeName string, jobName string, h *job.Host)
 
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -192,7 +195,6 @@ func (t *stringBuilder) Timeout(nodeName string, timeout time.Duration) interfac
 	if root := t.str.Timeout(timeout); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -200,7 +202,6 @@ func (t *stringBuilder) SCP(nodeName string, scp *job.ScpData) interface{} {
 	if root := t.str.SCP(scp); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -208,7 +209,6 @@ func (t *stringBuilder) Hosts(nodeName string) job.Group {
 	if root := t.str.Hosts(); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: root.(job.Branch)})
 	}
-
 	return nil
 }
 
@@ -216,23 +216,27 @@ func (t *stringBuilder) Host(nodeName string, c *job.Config, h *job.Host) job.Gr
 	if root := t.str.Host(c, h); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: root.(job.Branch)})
 	}
-
 	return nil
 }
 
 func (t *stringBuilder) ErrorSafeguard(nodeName string, child interface{}) interface{} {
-	return t.storeNode(nodeName, &visualizationNode{Branch: t.str.ErrorSafeguard(child).(job.Branch)})
+	if ret := t.str.ErrorSafeguard(child); ret != child {
+		return t.storeNode(nodeName, &visualizationNode{Branch: ret.(job.Branch)})
+	}
+	return child
 }
 
 func (t *stringBuilder) ContextBounds(nodeName string, child interface{}) interface{} {
-	return t.storeNode(nodeName, &visualizationNode{Branch: t.str.ContextBounds(child).(job.Branch)})
+	if ret := t.str.ContextBounds(child); ret != child {
+		return t.storeNode(nodeName, &visualizationNode{Branch: ret.(job.Branch)})
+	}
+	return child
 }
 
 func (t *stringBuilder) Retry(nodeName string, child interface{}, retries uint) interface{} {
 	if root := t.str.Retry(child, retries); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: root.(job.Branch)})
 	}
-
 	return nil
 }
 
@@ -240,7 +244,6 @@ func (t *stringBuilder) Templating(nodeName string, c *job.Config, h *job.Host) 
 	if root := t.str.Templating(c, h); root != nil {
 		t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -248,7 +251,6 @@ func (t *stringBuilder) SSHClient(nodeName string, host, user, keyFile, password
 	if root := t.str.SSHClient(host, user, keyFile, password, keyboardInteractive); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -256,7 +258,6 @@ func (t *stringBuilder) Forwarding(nodeName string, f *job.Forwarding) interface
 	if root := t.str.Forwarding(f); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -264,7 +265,6 @@ func (t *stringBuilder) Tunnel(nodeName string, f *job.Forwarding) interface{} {
 	if root := t.str.Tunnel(f); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -276,7 +276,6 @@ func (t *stringBuilder) Command(nodeName string, cmd *job.Command) interface{} {
 	if root := t.str.Command(cmd); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -284,7 +283,6 @@ func (t *stringBuilder) LocalCommand(nodeName string, cmd *job.Command) interfac
 	if root := t.str.LocalCommand(cmd); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -292,7 +290,6 @@ func (t *stringBuilder) Stdout(nodeName string, o *job.Output) interface{} {
 	if root := t.str.Stdout(o); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }
 
@@ -300,6 +297,5 @@ func (t *stringBuilder) Stderr(nodeName string, o *job.Output) interface{} {
 	if root := t.str.Stderr(o); root != nil {
 		return t.storeNode(nodeName, &visualizationNode{Branch: &job.SimpleBranch{Root: root.(job.Leaf)}})
 	}
-
 	return nil
 }

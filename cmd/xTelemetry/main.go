@@ -39,7 +39,7 @@ func main() {
 
 	go telemetry.StoreEvents(&store, events, done)
 	f.(flunc.Flunc)(context.TODO())
-	<-time.After(time.Second)
+	// <-time.After(time.Second)
 	close(events)
 	<-done
 

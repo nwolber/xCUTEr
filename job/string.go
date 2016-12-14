@@ -87,11 +87,11 @@ func (p *partHost) Wrap() interface{} {
 func (p *partHost) String(v *Vars) string {
 	vr := &Vars{}
 
-	if v != nil && v.tt != nil {
-		vr.tt = &TemplatingEngine{
-			Config: v.tt.Config,
+	if v != nil && v.Te != nil {
+		vr.Te = &TemplatingEngine{
+			Config: v.Te.Config,
 			Host:   p.h,
-			now:    v.tt.now,
+			now:    v.Te.now,
 		}
 	}
 
