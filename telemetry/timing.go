@@ -15,7 +15,7 @@ type Timing struct {
 	nodes map[string]*timingNode
 
 	JobRuntime time.Duration
-	Hosts      map[string]*timingNode
+	Hosts      map[*job.Host]*timingNode
 }
 
 // NewTiming generates a new Timing from the given config.
@@ -84,20 +84,20 @@ type timingNode struct {
 
 type timingBuilder struct {
 	nodes map[string]*timingNode
-	hosts map[string]*timingNode
+	hosts map[*job.Host]*timingNode
 }
 
-func (t *timingBuilder) storeNode(nodeName, hostName string) {
+func (t *timingBuilder) storeNode(nodeName string, host *job.Host) {
 	node := &timingNode{}
 	t.nodes[nodeName] = node
-	t.hosts[hostName] = node
+	t.hosts[host] = node
 }
 
 func newTimingBuilder() job.ConfigBuilder {
 	return &NamingBuilder{
 		NamedConfigBuilder: &timingBuilder{
 			nodes: make(map[string]*timingNode),
-			hosts: make(map[string]*timingNode),
+			hosts: make(map[*job.Host]*timingNode),
 		},
 	}
 }
@@ -139,7 +139,7 @@ func (t *timingBuilder) Hosts(nodeName string) job.Group {
 }
 
 func (t *timingBuilder) Host(nodeName string, c *job.Config, h *job.Host) job.Group {
-	t.storeNode(nodeName, h.Name)
+	t.storeNode(nodeName, h)
 	return &noopGroup{}
 }
 
