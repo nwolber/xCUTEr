@@ -91,6 +91,7 @@ func (info *runInfo) run() {
 		// release resources
 		cancel()
 		info.stop = time.Now()
+		info.j.events.Reset()
 		info.e.removeRunning(info)
 		info.e.addComplete(info)
 	}()
