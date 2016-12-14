@@ -12,7 +12,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/nwolber/xCUTEr/logger"
@@ -196,62 +195,4 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 		return
 	}
 	channel.SendRequest("exit-status", false, buf.Bytes())
-}
-
-func oldSCP(ctx context.Context, channel ssh.Channel, req *ssh.Request, verbose bool) {
-	defer channel.Close()
-
-	l, ok := ctx.Value(LoggerKey).(logger.Logger)
-	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
-	}
-
-	parts := strings.Split(string(req.Payload), " ")
-	exe := parts[0][4:]
-
-	if exe != "scp" {
-		l.Println("remote requested", exe, "denying")
-		req.Reply(false, nil)
-		return
-	}
-
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-
-	cmd := exec.CommandContext(ctx, exe, parts[1:]...)
-	cmd.Stdin = channel
-	cmd.Stdout = channel
-
-	if verbose {
-		cmd.Stderr = os.Stderr
-	}
-
-	exitCode := 0
-	if err := cmd.Run(); err != nil {
-		l.Println("error running", exe, err)
-		exitCode = 1
-
-		// TODO get exit code from err.(*exec.ExitStatus)
-	} else {
-		l.Println(exe, "completed successfully")
-	}
-
-	var buf bytes.Buffer
-	if err := binary.Write(&buf, binary.BigEndian, int32(exitCode)); err != nil {
-		l.Println("unable to convert int32 to byte")
-		return
-	}
-	channel.SendRequest("exit-status", false, buf.Bytes())
-}
-
-type bla struct {
-	dir string
-}
-
-func (x *bla) Write(b []byte) (int, error) {
-	log.Printf("!!!!!!!!!!!!!!!!!!!! %s: %q", x.dir, string(b))
-	return len(b), nil
 }
