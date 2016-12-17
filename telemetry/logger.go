@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -34,6 +35,8 @@ func (l *telemetryLogger) Log(t time.Time, message string) {
 	if !ok {
 		file = "???"
 	}
+
+	_, file = filepath.Split(file)
 
 	if l := len(message); message[l-1] == '\n' {
 		message = message[:l-1]
