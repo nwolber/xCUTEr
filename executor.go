@@ -146,20 +146,7 @@ func newExecutor(ctx context.Context, telemetryEndpoint string) (*executor, erro
 
 	cron := sched.New()
 
-	if telemetryEndpoint != "" {
-		statsdClient, err := statsd.New(telemetryEndpoint)
-		if err != nil {
-			return nil, err
-		}
-
-		statsdClient.Namespace = "xCUTEr"
-		go func(client *statsd.Client) {
-			<-ctx.Done()
-			client.Close()
-		}(statsdClient)
-	}
-
-	return &executor{
+	e := &executor{
 		mainCtx:      ctx,
 		maxCompleted: 10,
 		Start:        cron.Start,
@@ -170,7 +157,22 @@ func newExecutor(ctx context.Context, telemetryEndpoint string) (*executor, erro
 		inactive:     make(map[string]*schedInfo),
 		scheduled:    make(map[string]*schedInfo),
 		running:      make(map[string]*runInfo),
-	}, nil
+	}
+	if telemetryEndpoint != "" {
+		var err error
+		e.statsdClient, err = statsd.New(telemetryEndpoint)
+		if err != nil {
+			return nil, err
+		}
+
+		e.statsdClient.Namespace = "xCUTEr"
+		go func(client *statsd.Client) {
+			<-ctx.Done()
+			client.Close()
+		}(e.statsdClient)
+	}
+
+	return e, nil
 }
 
 func (e *executor) sendTelemetry(c *job.Config, events *[]telemetry.Event) {
@@ -182,10 +184,15 @@ func (e *executor) sendTelemetry(c *job.Config, events *[]telemetry.Event) {
 
 	timing.ApplyStore(*events)
 
-	e.statsdClient.Timing(c.Name+".runtime", timing.JobRuntime, nil, 1.0)
+	log.Println("sending telemetry data for job", c.Name)
+	if err := e.statsdClient.Timing(c.Name+".runtime", timing.JobRuntime, nil, 1.0); err != nil {
+		log.Println("error sending telemetry data for job", c.Name, err)
+	}
 
 	for host, stats := range timing.Hosts {
-		e.statsdClient.Timing(fmt.Sprintf("%s.%s.runtime", c.Name, host.Name), stats.Runtime, nil, 1.0)
+		if err := e.statsdClient.Timing(fmt.Sprintf("%s.%s.runtime", c.Name, host.Name), stats.Runtime, nil, 1.0); err != nil {
+			log.Println("error sending telemetry data for job", c.Name, "host", host.Name, err)
+		}
 	}
 }
 
