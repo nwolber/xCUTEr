@@ -55,7 +55,7 @@ func (m *scpCMessage) process(s *scpImp) error {
 		}
 		defer f.Close()
 
-		ack(s.out)
+		s.ack(s.out)
 
 		// TODO: read from underlying reader without buffering
 		fileReader := io.LimitReader(s.in, int64(m.length))
@@ -81,7 +81,7 @@ func (m *scpCMessage) process(s *scpImp) error {
 	if r != 0 {
 		return fmt.Errorf("parser: expected: %q, found: %q", '\x00', r)
 	}
-	ack(s.out)
+	s.ack(s.out)
 
 	return nil
 }
@@ -134,7 +134,7 @@ func (m scpDMessage) process(s *scpImp) error {
 		s.timeSet = false
 	}
 
-	ack(s.out)
+	s.ack(s.out)
 
 	return nil
 }
@@ -158,7 +158,7 @@ func (m scpEMessage) process(s *scpImp) error {
 	s.dir, _ = filepath.Split(s.dir)
 	s.dir = filepath.Clean(s.dir)
 
-	ack(s.out)
+	s.ack(s.out)
 
 	return nil
 }
@@ -201,7 +201,7 @@ func (m scpTMessage) process(s *scpImp) error {
 	s.mTime = m.mTime
 	s.timeSet = true
 
-	ack(s.out)
+	s.ack(s.out)
 	return nil
 }
 
