@@ -10,7 +10,7 @@ import (
 )
 
 func (s *scpImp) runSink() error {
-	ack(s.out)
+	s.ack(s.out)
 	p := parser{
 		s: s,
 	}
@@ -263,7 +263,8 @@ func parseSCPMessage(input []byte) (scpMessage, error) {
 	return m, nil
 }
 
-func ack(out io.Writer) {
+func (s *scpImp) ack(out io.Writer) {
+	s.l.Println("sending ack")
 	out.Write([]byte{0})
 }
 

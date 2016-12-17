@@ -151,7 +151,7 @@ func (t *stringBuilder) storeNode(nodeName string, node *visualizationNode) *vis
 func newStringBuilder() job.ConfigBuilder {
 	return &NamingBuilder{
 		NamedConfigBuilder: &stringBuilder{
-			str:   &job.StringBuilder{Full: false},
+			str:   &job.StringBuilder{Full: true},
 			nodes: make(map[string]*visualizationNode),
 		},
 	}
