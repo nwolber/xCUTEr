@@ -65,7 +65,7 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, telem
 
 	// do we run only a single job file?
 	if file != "" {
-		j, err := parse(file)
+		j, err := e.parse(file)
 		if err != nil {
 			err = fmt.Errorf("error parsing %s: %s", file, err)
 			mainCancel()
@@ -90,7 +90,7 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, telem
 				select {
 				case event := <-fsEvents:
 					if event.Op&fsnotify.Create == fsnotify.Create {
-						j, err := parse(event.Name)
+						j, err := e.parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
 							continue
@@ -103,7 +103,7 @@ func New(jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile, telem
 					} else if event.Op&fsnotify.Write == fsnotify.Write {
 						e.Remove(event.Name)
 
-						j, err := parse(event.Name)
+						j, err := e.parse(event.Name)
 						if err != nil {
 							log.Println("error parsing", event.Name, err)
 							continue
