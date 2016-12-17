@@ -190,13 +190,13 @@ func (e *executor) sendTelemetry(c *job.Config, events *[]telemetry.Event) {
 }
 
 // parse parses the given file and stores the execution tree in the jobInfo.
-func parse(file string) (*jobInfo, error) {
+func (e *executor) parse(file string) (*jobInfo, error) {
 	c, err := job.ReadConfig(file)
 	if err != nil {
 		return nil, err
 	}
 
-	useTelemetry := c.Telemetry
+	useTelemetry := c.Telemetry && e.statsdClient != nil
 
 	start := time.Now()
 	var (
