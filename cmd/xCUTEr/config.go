@@ -31,7 +31,7 @@ func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile,
 	flag.BoolVar(&once, "once", onceDefault, "Run job only once, regardless of the schedule. Only in combination with -f.")
 	flag.BoolVar(&quiet, "quiet", quietDefault, "Silence xCUTEr by turning off log messages. Command output is still printed. Overwrites -log.")
 	flag.StringVar(&logFile, "log", logFileDefault, "Log file.")
-	flag.StringVar(&telemetryEndpoint, "statsd", telemetryEndpointDefault, "UDP endpoint for statsd messages.")
+	flag.StringVar(&telemetryEndpoint, "statsd", telemetryEndpointDefault, "UDP endpoint for statsd messages (e.g. localhost:12345).")
 	flag.StringVar(&perf, "perf", defaultPerf, "Perf endpoint.")
 
 	help := flag.Bool("help", false, "Display this help")
