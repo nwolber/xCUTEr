@@ -51,7 +51,7 @@ type scpImp struct {
 	verbose          bool
 	in               *bufio.Reader
 	out              io.Writer
-	l                *log.Logger
+	l                logger
 	mTime, aTime     time.Time
 	timeSet          bool
 	openFile         func(name string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
