@@ -51,6 +51,8 @@ func config() (jobDir string, sshTTL, sshKeepAlive time.Duration, file, logFile,
 		fmt.Println("once  :", once)
 		fmt.Println("quiet :", quiet)
 		fmt.Println("log   :", logFile)
+		fmt.Println("statsd:", telemetryEndpoint)
+		fmt.Println("perf  :", perf)
 		os.Exit(0)
 	}
 
