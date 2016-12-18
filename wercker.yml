@@ -10,6 +10,7 @@ build:
             name: go build
             code: |
                 ./build
+                mv bin/* $WERCKER_OUTPUT_DIR
         - script:
             name: go test
             code: |
