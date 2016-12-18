@@ -174,7 +174,7 @@ Gives the Job a name.
 ##### Schedule
 Schedule when to execute the job.
 The syntax is an extended CRON syntax.
-The syntax can be found [here](https://godoc.org/github.com/robfig/cron#hdr-CRON_Expression_Format).
+The syntax can be found [here](https://godoc.org/github.com/nwolber/cron#hdr-CRON_Expression_Format).
 
 ```json
 "schedule": "@every 1m"
