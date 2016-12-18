@@ -3,13 +3,13 @@ build:
     steps:
         - setup-go-workspace
         - script:
-            name: go vet
-            code: |
-                go vet
-        - script:
                 name: go get
                 code: |
                     go get
+        - script:
+            name: go vet
+            code: |
+                go vet
         - script:
                 name: go build
                 code: |
