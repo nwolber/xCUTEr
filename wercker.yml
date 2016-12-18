@@ -2,12 +2,14 @@ box: golang
 build:
     steps:
         - setup-go-workspace
-
+        - script:
+            name: go vet
+            code: |
+                go vet
         - script:
                 name: go get
                 code: |
                     go get
-
         - script:
                 name: go build
                 code: |
@@ -19,7 +21,6 @@ build:
                     GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-windows-amd64.exe ./cmd/xValidate
                     GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-darwin-amd64 ./cmd/xValidate
                     GOOS=solaris GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-solaris-amd64 ./cmd/xValidate
-
         - script:
                 name: go test
                 code: |
