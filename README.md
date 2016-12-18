@@ -9,7 +9,7 @@ It watches a directory for job definition files and executes them.
 go get -u github.com/nwolber/xCUTEr/...
 ```
 
-Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS X and Windows to the `/bin` directory. 
+Alternativly run the `./build` script. This compiles binaries for Linux, Mac OS X, Solaris and Windows to the `/bin` directory. 
 
 ## Command line arguments
 
@@ -22,6 +22,11 @@ Takes presedence over `-jobs`.
 * `-quiet` Disable any log output from xCUTEr. Output from commands or SCP in verbose mode is still printed.
 * `-log` Log file.
 * `-statsd` UDP endpoint for statsd messages (e.g. localhost:12345).
+This will send runtime information about jobs and individual hosts in statsd format e.g.:
+```
+xCUTEr.Test Job.runtime:29735.750123|ms
+xCUTEr.Test Job.Awesome box.runtime:29734.493721|ms
+```
 
 ## Job definition
 
