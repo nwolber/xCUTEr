@@ -1,20 +1,27 @@
 
 box: golang
 build:
-  steps:
-    - setup-go-workspace
+	steps:
+		- setup-go-workspace
 
-    - script:
-        name: go get
-        code: |
-          go get
+		- script:
+				name: go get
+				code: |
+					go get
 
-    - script:
-        name: go build
-        code: |
-          go build ./...
+		- script:
+				name: go build
+				code: |
+					GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xCUTEr-linux-amd64 ./cmd/xCUTEr
+					GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xCUTEr-windows-amd64.exe ./cmd/xCUTEr
+					GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xCUTEr-darwin-amd64 ./cmd/xCUTEr
+					GOOS=solaris GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xCUTEr-solaris-amd64 ./cmd/xCUTEr
+					GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-linux-amd64 ./cmd/xValidate
+					GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-windows-amd64.exe ./cmd/xValidate
+					GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-darwin-amd64 ./cmd/xValidate
+					GOOS=solaris GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s" -o bin/xValidate-solaris-amd64 ./cmd/xValidate
 
-    - script:
-        name: go test
-        code: |
-          go test ./...
+		- script:
+				name: go test
+				code: |
+					go test ./...
