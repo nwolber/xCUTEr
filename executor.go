@@ -165,7 +165,7 @@ func newExecutor(ctx context.Context, telemetryEndpoint string) (*executor, erro
 			return nil, err
 		}
 
-		e.statsdClient.Namespace = "xCUTEr"
+		e.statsdClient.Namespace = "xCUTEr."
 		go func(client *statsd.Client) {
 			<-ctx.Done()
 			client.Close()
