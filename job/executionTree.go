@@ -55,21 +55,29 @@ func (g *executionGroup) Wrap() interface{} {
 	return g.group(g.fluncs...)
 }
 
-// ExecutionTreeVisitor creates subtrees of an execution tree.
+// ExecutionTreeBuilder creates subtrees of an execution tree.
 type ExecutionTreeBuilder struct{}
 
+// Sequential returns a Group that executes its contents sequentially.
 func (e *ExecutionTreeBuilder) Sequential() Group {
 	return &executionGroup{group: flunc.Sequential}
 }
 
+// Parallel returns a Group that executes its contents parallel.
 func (e *ExecutionTreeBuilder) Parallel() Group {
 	return &executionGroup{group: flunc.Parallel}
 }
 
+// Job returns a container for job-level Fluncs.
 func (e *ExecutionTreeBuilder) Job(name string) Group {
 	return e.Sequential()
 }
 
+// Output returns a Flunc that, when executed, adds an io.Writer to the
+// context. If there is already an output present, it creates an
+// io.MultiWriter that writes to both outputs.
+//
+// It requires a TemplatingEngine to function properly.
 func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, _ := ctx.Value(OutputKey).(io.Writer)
@@ -140,6 +148,10 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 	return f, nil
 }
 
+// JobLogger returns a Flunc that, when executed, adds log.Logger to the context
+// that prefixes the log messages it prints with the job name.
+//
+// It requires an Output to function properly.
 func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(OutputKey).(io.Writer)
@@ -153,7 +165,11 @@ func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 	})
 }
 
-func (e *ExecutionTreeBuilder) HostLogger(jobName string, h *Host) interface{} {
+// HostLogger returns a Flunc that, when executed, adds log.Logger to the context
+// that prefixes the log messages it prints with the host name.
+//
+// It requires an Output to function properly.
+func (e *ExecutionTreeBuilder) HostLogger(hostName string, h *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
@@ -167,12 +183,16 @@ func (e *ExecutionTreeBuilder) HostLogger(jobName string, h *Host) interface{} {
 			name = fmt.Sprintf("%s@%s:%d", h.User, h.Addr, h.Port)
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s: ", jobName, name), log.Flags())
+		logger := log.New(output, fmt.Sprintf("%s - %s: ", hostName, name), log.Flags())
 		logger.Println("logger created")
 		return context.WithValue(ctx, LoggerKey, logger), nil
 	})
 }
 
+// Timeout returns a Flunc that, when executed, adds a timeout to the
+// context after the given duration.
+//
+// It requires a logger to function properly.
 func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -182,7 +202,7 @@ func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 			return nil, err
 		}
 
-		// it's ok to "leak" the cancel, because cancelation happens
+		// its ok to "leak" the cancel, because cancelation happens
 		// automatically when the job ends
 		ctx, _ = context.WithTimeout(ctx, timeout)
 		l.Println("set timeout to", timeout)
@@ -190,6 +210,10 @@ func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 	})
 }
 
+// SCP returns a Flunc that, when executed, starts a new SCP server with the
+// given configuration.
+//
+// It requires a logger to function properly.
 func (e *ExecutionTreeBuilder) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -212,14 +236,21 @@ func (e *ExecutionTreeBuilder) SCP(scp *ScpData) interface{} {
 	})
 }
 
+// Hosts returns a Group that executes its contents in parallel.
 func (e *ExecutionTreeBuilder) Hosts() Group {
 	return e.Parallel()
 }
 
+// Host returns a Group that executes its contents sequentially.
 func (e *ExecutionTreeBuilder) Host(c *Config, h *Host) Group {
 	return e.Sequential()
 }
 
+// ErrorSafeguard returns a Flunc that, when executed, will call its child.
+// If the child returns an error the error will be logged but otherwise
+// discarded and not passed to the parent.
+//
+// It requires a logger to function properly.
 func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
@@ -243,6 +274,8 @@ func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 	})
 }
 
+// ContextBounds returns a Flunc that, when executed, doesn't propagade the
+// context it received from its child to its parent.
 func (e *ExecutionTreeBuilder) ContextBounds(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
@@ -258,7 +291,12 @@ func (e *ExecutionTreeBuilder) ContextBounds(child interface{}) interface{} {
 	})
 }
 
-func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{} {
+// Retry returns a Flunc that, when executed, restarts its child, if it returned
+// an error. When numRetires retries have been made and the child still failed
+// the latest error will be returned to the parent.
+//
+// It requires a logger to function properly.
+func (e *ExecutionTreeBuilder) Retry(child interface{}, numRetries uint) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
 		log.Panicf("not a flunc %T", child)
@@ -277,7 +315,7 @@ func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{
 			childCtx context.Context
 			err      error
 		)
-		for ; i < retries; i++ {
+		for ; i < numRetries; i++ {
 			childCtx, err = f(ctx)
 			if err == nil {
 				break
@@ -289,13 +327,20 @@ func (e *ExecutionTreeBuilder) Retry(child interface{}, retries uint) interface{
 	})
 }
 
-func (e *ExecutionTreeBuilder) Templating(c *Config, h *Host) interface{} {
+// Templating returns a Flunc that, when executed, adds a new TemplatingEngine
+// with the information from config and host to the context.
+func (e *ExecutionTreeBuilder) Templating(config *Config, host *Host) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
-		tt := newTemplatingEngine(c, h)
+		tt := newTemplatingEngine(config, host)
 		return context.WithValue(ctx, TemplatingKey, tt), nil
 	})
 }
 
+// SSHClient returns a Flunc that, when executed, adds a SSH client to the
+// context. This is either a new client or an existing client that is being
+// reused.
+//
+// It requires a logger to function properly.
 func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, keyboardInteractive map[string]string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -317,6 +362,10 @@ func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, key
 	})
 }
 
+// Forwarding returns a Flunc that, when executed, establishes a port forwarding
+// from the host to the client.
+//
+// It requires a logger and a SSHClient to function properly.
 func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -340,6 +389,10 @@ func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 	})
 }
 
+// Tunnel returns a Flunc that, when executed, establishes a port forwaring from
+// the client to the host.
+//
+// It requires a logger and a SSHClient to function properly.
 func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -363,10 +416,16 @@ func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 	})
 }
 
+// Commands returns a Group that executes its contents sequentially.
 func (e *ExecutionTreeBuilder) Commands(cmd *Command) Group {
 	return e.Sequential()
 }
 
+// Command returns a Flunc that, when executed, runs the command on the host.
+//
+// It requires a logger, a SSHClient and a TemplatingEngine to function properly.
+// It also redirects the commands STDERR and STDOUT to the ones in the context,
+// if available. Otherwise os.Stderr and os.Stdout will be used, respectivly.
 func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -410,6 +469,12 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 	})
 }
 
+// LocalCommand returns a Flunc that, when executed, runs the command on the
+// client.
+//
+// It requires a logger and a TemplatingEngine to function properly.
+// It also redirects the commands STDERR and STDOUT to the ones in the context,
+// if available. Otherwise os.Stderr and os.Stdout will be used, respectivly.
 func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
@@ -468,6 +533,11 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 	})
 }
 
+// Stdout returns a Flunc that, when executed, adds a file to the context that
+// can be used as STDOUT for Commands. It will close the file, when the Flunc
+// returns.
+//
+// It requires a logger and a TemplatingEngine to function properly.
 func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {
@@ -511,6 +581,11 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 	})
 }
 
+// Stderr returns a Flunc that, when executed, adds a file to the context that
+// can be used as STDERR for Commands. It will close the file when the Flunc
+// returns.
+//
+// It requires a logger and a TemplatingEngine to function properly.
 func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		if o.File == "null" {

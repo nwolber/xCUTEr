@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// A TemplatingEngine can treat templating strings as defined by the Go
+// text/template package. It uses information from the Config, Host, environment
+// variables and the current time to replace place holders in the string.
 type TemplatingEngine struct {
 	Config *Config
 	Host   *Host
@@ -40,6 +43,8 @@ func newTemplatingEngine(c *Config, h *Host) *TemplatingEngine {
 	}
 }
 
+// Interpolate tries to replace all place holders present in templ with
+// information stored in the TemplatingEngine.
 func (t *TemplatingEngine) Interpolate(templ string) (string, error) {
 	var buf bytes.Buffer
 

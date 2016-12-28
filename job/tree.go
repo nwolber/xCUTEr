@@ -10,17 +10,23 @@ import (
 	"strings"
 )
 
+// Vars is used to store information needed to create a proper string
+// representation of an execution tree.
 type Vars struct {
 	Te *TemplatingEngine
 }
 
+// Stringer can use information stored in Vars to create a string.
 type Stringer interface {
 	String(v *Vars) string
 }
 
+// TreeBuilder builds a tree that can be used to create a textual representation
+// of an execution tree.
 type TreeBuilder struct {
 }
 
+// A Leaf is a node in a tree that has no more children.
 type Leaf string
 
 func (s Leaf) String(v *Vars) string {
@@ -37,11 +43,13 @@ func (s Leaf) String(v *Vars) string {
 	return str
 }
 
+// Branch is a node in a tree that potentially has children.
 type Branch interface {
 	Stringer
 	Group
 }
 
+// SimpleBranch implements the Branch interface.
 type SimpleBranch struct {
 	Root  Leaf
 	Leafs []Stringer
@@ -49,6 +57,8 @@ type SimpleBranch struct {
 	raw   bool
 }
 
+// Append adds any given number of children to the branch. All children have
+// to implement Stringer.
 func (s *SimpleBranch) Append(children ...interface{}) {
 	for _, cc := range children {
 		if cc == nil {
@@ -64,6 +74,7 @@ func (s *SimpleBranch) Append(children ...interface{}) {
 	}
 }
 
+// Wrap returns the branch.
 func (s *SimpleBranch) Wrap() interface{} {
 	return s
 }

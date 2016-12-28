@@ -82,6 +82,8 @@ type hostsFile struct {
 	MatchString string `json:"matchString,omitempty"`
 }
 
+// Host holds all information about a host such as its address and means to
+// authenticate via SSH.
 type Host struct {
 	Name                string            `json:"name,omitempty"`
 	Addr                string            `json:"addr,omitempty"`
@@ -93,6 +95,8 @@ type Host struct {
 	Tags                map[string]string `json:"tags,omitempty"`
 }
 
+// Output describes a file used for output in different scenarios such as
+// logging and STDOUT and STDERR of commands.
 type Output struct {
 	File      string `json:"file,omitempty"`
 	Raw       bool   `json:"raw,omitempty"`
@@ -103,6 +107,9 @@ func (o Output) String() string {
 	return fmt.Sprintf("%s, Raw: %t, Overwrite: %t", o.File, o.Raw, o.Overwrite)
 }
 
+// MarshalJSON either marshals the Output as a JSON string, if both Raw and
+// Overwrite are false. If one or both are true the Output is marshaled as a
+// JSON object.
 func (o *Output) MarshalJSON() ([]byte, error) {
 	if !o.Raw && !o.Overwrite {
 		return []byte(o.File), nil
@@ -116,6 +123,9 @@ func (o *Output) MarshalJSON() ([]byte, error) {
 	return json.Marshal(obj)
 }
 
+// UnmarshalJSON unmarshals an Output either from a JSON string. In this case
+// both Raw and Overwrite will be false. Or from a JSON object in that case
+// Raw and Overwrite will have the values provided.
 func (o *Output) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &o.File); err == nil {
 		return nil
@@ -142,6 +152,8 @@ func (o *Output) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Forwarding describes a tunnel between client and host independent from the
+// tunnels direction.
 type Forwarding struct {
 	RemoteHost string `json:"remoteHost,omitempty"`
 	RemotePort uint16 `json:"remotePort,omitempty"`
@@ -149,6 +161,7 @@ type Forwarding struct {
 	LocalPort  uint16 `json:"localPort,omitempty"`
 }
 
+// ScpData describes configuration for a SCP server.
 type ScpData struct {
 	Addr    string `json:"addr,omitempty"`
 	Port    uint   `json:"port,omitempty"`
@@ -156,6 +169,8 @@ type ScpData struct {
 	Verbose bool   `json:"verbose,omitempty"`
 }
 
+// Command describes a command that can be executed on the client or a remote
+// host connected via SSH.
 type Command struct {
 	Name        string     `json:"name,omitempty"`
 	Command     string     `json:"command,omitempty"`
@@ -216,6 +231,7 @@ func removeLineComments(reader io.Reader, indicator string) io.ReadCloser {
 	return r
 }
 
+// parseConfig parses a Config object from the eader.
 func parseConfig(r io.Reader) (*Config, error) {
 	r = removeLineComments(r, cLineComments)
 	d := json.NewDecoder(r)
@@ -252,6 +268,9 @@ func parseHostsFile(r io.Reader, pattern, matchString string) (hostConfig, error
 	return filterHosts(hosts, pattern, matchString)
 }
 
+// filterHosts returns a new hostConfig that only containes hosts matching
+// pattern after the matchString has been run through templating with the hosts
+// configuration.
 func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
