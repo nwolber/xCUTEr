@@ -63,7 +63,9 @@ func InitializeSSHClientStore(ttl time.Duration) {
 						log.Println("connection to", key, "unused for", diff, "closing")
 						elem.client.c.Close()
 						delete(store.clients, key)
-						close(elem.client.trashed)
+						if elem.client.trashed != nil {
+							close(elem.client.trashed)
+						}
 					}
 				}
 			}()
@@ -135,8 +137,10 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 			defer store.m.Unlock()
 			if _, ok := store.clients[key]; ok {
 				delete(store.clients, key)
+				if client.trashed != nil {
+					close(client.trashed)
+				}
 			}
-			close(client.trashed)
 		}(client)
 
 		store.m.Lock()
@@ -224,8 +228,7 @@ var createClient = func(ctx context.Context, addr, user, keyFile, password strin
 
 	l.Println("connected to", addr)
 	return &sshClient{
-		c:       client,
-		trashed: make(chan struct{}),
+		c: client,
 	}, nil
 }
 
