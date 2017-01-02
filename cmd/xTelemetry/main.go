@@ -51,7 +51,7 @@ func main() {
 
 	fmt.Printf("Total runtime: %s\n", timing.JobRuntime)
 	for name, timings := range timing.Hosts {
-		fmt.Printf("%s: %s\n", name, timings.Runtime)
+		fmt.Printf("%s: %s\n", name.Name, timings.Runtime)
 	}
 }
 
