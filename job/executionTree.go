@@ -275,7 +275,9 @@ func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 }
 
 // ContextBounds returns a Flunc that, when executed, doesn't propagade the
-// context it received from its child to its parent.
+// context it received from its child to its parent. Additionally the context
+// passed to the child gets canceled as soon as the child returns. This cleans
+// up any go routines started by the child waiting for the context.
 func (e *ExecutionTreeBuilder) ContextBounds(child interface{}) interface{} {
 	f, ok := child.(flunc.Flunc)
 	if !ok {
