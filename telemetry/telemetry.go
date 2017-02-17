@@ -14,45 +14,6 @@ import (
 	"github.com/nwolber/xCUTEr/logger"
 )
 
-type EventType uint
-
-const (
-	EventStart EventType = iota
-	EventLog
-	EventEnd
-	EventFailed
-)
-
-func (e EventType) String() string {
-	switch e {
-	case EventStart:
-		return "Start"
-	case EventLog:
-		return "Log"
-	case EventEnd:
-		return "End"
-	case EventFailed:
-		return "Failed"
-	}
-	return "Unknown"
-}
-
-type Event struct {
-	Type      EventType
-	Timestamp time.Time
-	Name      string
-	Info      LogInfo
-}
-
-func StoreEvents(store *[]Event, events <-chan Event, done chan struct{}) {
-	for event := range events {
-		*store = append(*store, event)
-	}
-	if done != nil {
-		close(done)
-	}
-}
-
 func instrument(name string, f flunc.Flunc, events *EventStore) flunc.Flunc {
 	if name == "" {
 		log.Panicln("name may not be empty")

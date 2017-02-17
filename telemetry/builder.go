@@ -5,7 +5,6 @@
 package telemetry
 
 import (
-	"sync"
 	"time"
 
 	"github.com/nwolber/xCUTEr/flunc"
@@ -26,36 +25,6 @@ func (n *nodeGroup) Append(children ...interface{}) {
 
 func (n *nodeGroup) Wrap() interface{} {
 	return instrument(n.name, n.group.Wrap().(flunc.Flunc), n.events)
-}
-
-// An EventStore stores Events.
-type EventStore struct {
-	m      sync.Mutex
-	events []Event
-}
-
-func (e *EventStore) store(event Event) {
-	e.m.Lock()
-	defer e.m.Unlock()
-	e.events = append(e.events, event)
-}
-
-// Get returns a copy of all Events in the store.
-func (e *EventStore) Get() []Event {
-	e.m.Lock()
-	defer e.m.Unlock()
-	events := e.events
-	return events
-}
-
-// Reset clears all events and returns a copy of all
-// events that have been cleared.
-func (e *EventStore) Reset() []Event {
-	e.m.Lock()
-	defer e.m.Unlock()
-	events := e.events
-	e.events = []Event{}
-	return events
 }
 
 type telemetryBuilder struct {
