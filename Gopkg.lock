@@ -46,8 +46,14 @@
 [[projects]]
   name = "github.com/nwolber/cron"
   packages = ["."]
-  revision = "b024fc5ea0e34bc3f83d9941c8d60b0622bfaca4"
-  version = "v1"
+  revision = "3337f241f9024dfaf7ae738b12d6e87a8173f4dd"
+  version = "v1.1"
+
+[[projects]]
+  name = "github.com/pborman/uuid"
+  packages = ["."]
+  revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
+  version = "v1.1"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
