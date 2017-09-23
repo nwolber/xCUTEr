@@ -193,6 +193,8 @@ var createClient = func(ctx context.Context, addr, user, keyFile, password strin
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{},
+		// TODO: figure out a suitable way to check the host key if necessary
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	if keyFile != "" {
