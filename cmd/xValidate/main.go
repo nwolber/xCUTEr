@@ -31,7 +31,7 @@ func main() {
 		maxHosts = 1
 	}
 
-	fmt.Printf("Execution tree:\n%s", config.Tree(full, raw, maxHosts, 0))
+	fmt.Printf("Execution tree:\n%s\n", config.Tree(full, raw, maxHosts, 0))
 }
 
 func flags() (file string, all, raw, full, json bool) {
