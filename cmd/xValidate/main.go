@@ -31,7 +31,13 @@ func main() {
 		maxHosts = 1
 	}
 
-	fmt.Printf("Execution tree:\n%s\n", config.Tree(full, raw, maxHosts, 0))
+	tree, err := config.Tree(full, raw, maxHosts, 0)
+	if err != nil {
+		fmt.Println("error building execution tree:", err)
+		return
+	}
+
+	fmt.Printf("Execution tree:\n%s\n", tree)
 }
 
 func flags() (file string, all, raw, full, json bool) {
