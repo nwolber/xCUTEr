@@ -320,6 +320,7 @@ A command es executed on the host defined by either `host` or `hosts`.
     "target": "local",
     "retries": 3,
     "ignoreError": true,
+    "timeout": "30s",
     "stdout": "stdout.txt",
     "stderr": "stderr.txt"
 }
@@ -342,6 +343,7 @@ Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDOUT.
 Supports the same extended form as *[output](#output)*.
 Supports *[templating](#templating)*.
+* timeout: Timeout when the current command and all child commands are canceled.
 * stderr: File where to redirect STDERR of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDERR.

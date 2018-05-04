@@ -73,7 +73,7 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Timeout != "" {
 		timeout, err := time.ParseDuration(c.Timeout)
 		if err != nil {
-			return nil, errs.Wrapf(err, "failed to parse timeout %s", c.Timeout)
+			return nil, errs.Wrapf(err, "failed to parse job timeout %s", c.Timeout)
 		}
 		children.Append(builder.Timeout(timeout))
 	}
@@ -204,6 +204,14 @@ func visitCommand(builder ConfigBuilder, cmd *Command) (interface{}, error) {
 		}
 	}
 	children.Append(stdout, stderr)
+
+	if cmd.Timeout != "" {
+		timeout, err := time.ParseDuration(cmd.Timeout)
+		if err != nil {
+			return nil, errs.Wrapf(err, "failed to parse command timeout %s", cmd.Timeout)
+		}
+		children.Append(builder.Timeout(timeout))
+	}
 
 	var cmds interface{}
 

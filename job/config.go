@@ -195,6 +195,7 @@ type Command struct {
 	Flow        string     `json:"flow,omitempty"`
 	Target      string     `json:"target,omitempty"`
 	Retries     uint       `json:"retries,omitempty"`
+	Timeout     string     `json:"timeout,omitempty"`
 	IgnoreError bool       `json:"ignoreError,omitempty"`
 	Stdout      *Output    `json:"stdout,omitempty"`
 	Stderr      *Output    `json:"stderr,omitempty"`
