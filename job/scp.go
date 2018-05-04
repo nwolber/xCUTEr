@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/nwolber/xCUTEr/logger"
 	"github.com/nwolber/xCUTEr/scp"
+	errs "github.com/pkg/errors"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -23,7 +23,7 @@ import (
 func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) error {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	config := &ssh.ServerConfig{
@@ -43,7 +43,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) er
 
 	private, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		err = fmt.Errorf("failed to parse private key %s", err)
+		err = errs.Wrap(err, "failed to parse private key")
 		l.Println(err)
 		return err
 	}
@@ -52,7 +52,7 @@ func doSCP(ctx context.Context, privateKey []byte, addr string, verbose bool) er
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		err = fmt.Errorf("failed to listen for connection %s", err)
+		err = errs.Wrapf(err, "failed to listen for connection on %s", addr)
 		l.Println(err)
 		return err
 	}
@@ -88,7 +88,7 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 	defer nConn.Close()
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	defer l.Println("handleSSHConnection: connection closed")
@@ -133,7 +133,7 @@ func handleSSHConnection(ctx context.Context, nConn net.Conn, config *ssh.Server
 func serveRequests(ctx context.Context, channel ssh.Channel, in <-chan *ssh.Request, verbose bool) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	for {
@@ -164,7 +164,7 @@ func handleExecRequest(ctx context.Context, channel ssh.Channel, req *ssh.Reques
 
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	parts := strings.Split(string(req.Payload), " ")

@@ -4,7 +4,11 @@
 
 package flunc
 
-import "context"
+import (
+	"context"
+
+	errs "github.com/pkg/errors"
+)
 
 // A Flunc is a function that is able to run in a given context. It may
 // manipulate the context by returning a new one.
@@ -17,7 +21,7 @@ type Flunc func(context.Context) (context.Context, error)
 // the error is returned to the calling Flunc.
 func Sequential(children ...Flunc) Flunc {
 	return func(ctx context.Context) (context.Context, error) {
-		for _, child := range children {
+		for i, child := range children {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -30,7 +34,7 @@ func Sequential(children ...Flunc) Flunc {
 
 			childCtx, err := child(ctx)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrapf(err, "sequential flunc, child %d failed", i)
 			}
 
 			if childCtx != nil {
@@ -65,19 +69,19 @@ func Parallel(children ...Flunc) Flunc {
 
 		childCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		for _, child := range children {
+		for i, child := range children {
 			if child == nil {
 				numChildren--
 				continue
 			}
 
-			go func(ctx context.Context, child Flunc, done chan error) {
+			go func(ctx context.Context, i int, child Flunc, done chan error) {
 				_, err := child(ctx)
 				select {
-				case done <- err:
+				case done <- errs.Wrapf(err, "parallel flunc, child %d failed", i):
 				case <-ctx.Done():
 				}
-			}(childCtx, child, done)
+			}(childCtx, i, child, done)
 		}
 
 		for i := 0; i < numChildren; i++ {

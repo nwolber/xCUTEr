@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/nwolber/xCUTEr/logger"
+	errs "github.com/pkg/errors"
 )
 
 type storeElement struct {
@@ -86,7 +87,7 @@ func waitConn(client *ssh.Client) chan error {
 func newSSHClient(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	key := fmt.Sprintf("%s@%s", user, addr)
@@ -104,7 +105,7 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 	if !ok {
 		client, err := createClient(ctx, addr, user, keyFile, password, keyboardInteractive)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrap(err, "failed to create SSH client")
 		}
 
 		go func(client *sshClient) {
@@ -119,13 +120,13 @@ func newSSHClient(ctx context.Context, addr, user, keyFile, password string, key
 					l.Println("sending keep-alive request to", key)
 					_, _, err := client.c.SendRequest("xCUTEr keep-alive", true, nil)
 					if err != nil {
-						l.Println("keep-alive to", key, "failed:", err)
+						l.Printf("keep-alive to %s failed: %+v", key, err)
 						continue
 					}
 					l.Println("keep-alive to", key, "successful")
 				case err := <-connClosed:
 					if err != nil {
-						l.Println("connection to", key, "closed, removing from store:", err)
+						l.Errorf("connection to %s closed, removing from store: %s", key, err)
 					} else {
 						l.Println("conntection to", key, "closed without error, removing from store")
 					}
@@ -187,7 +188,7 @@ type sshClient struct {
 var createClient = func(ctx context.Context, addr, user, keyFile, password string, keyboardInteractive map[string]string) (*sshClient, error) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	config := &ssh.ClientConfig{
@@ -200,15 +201,15 @@ var createClient = func(ctx context.Context, addr, user, keyFile, password strin
 	if keyFile != "" {
 		s, _, err := readPrivateKeyFile(keyFile, nil)
 		if err != nil {
-			err = fmt.Errorf("Unable to read private key %s", err)
-			l.Println(err)
+			err = errs.Wrapf(err, "failed to read private key %s", keyFile)
+			l.Error(err)
 			return nil, err
 		}
 
 		signer, err := ssh.NewSignerFromSigner(s)
 		if err != nil {
-			err = fmt.Errorf("Unable to turn signer into signer %s", err)
-			l.Println(err)
+			err = errs.Wrap(err, "unable to turn signer into signer")
+			l.Error(err)
 			return nil, err
 		}
 		config.Auth = append(config.Auth, ssh.PublicKeys(signer))
@@ -225,7 +226,7 @@ var createClient = func(ctx context.Context, addr, user, keyFile, password strin
 	l.Println("no existing connection, connecting to", addr)
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrapf(err, "failed to dial SSH %s", addr)
 	}
 
 	l.Println("connected to", addr)
@@ -254,7 +255,7 @@ func keyboardInteractiveChallenge(user string, keyboardInteractive map[string]st
 func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	select {
@@ -266,7 +267,8 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 
 	session, err := s.c.NewSession()
 	if err != nil {
-		l.Println("failed to create session:", err)
+		err = errs.Wrap(err, "failed to create session")
+		l.Error(err)
 		return err
 	}
 	defer session.Close()
@@ -281,7 +283,9 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 
 	l.Printf("executing %q", command)
 	if err := session.Start(command); err != nil {
-		l.Printf("failed to start: %q, %s", command, err)
+		err = errs.Wrapf(err, "failed to start %q", command)
+		l.Error(err)
+		return err
 	}
 
 	done := make(chan error)
@@ -295,7 +299,8 @@ func (s *sshClient) executeCommand(ctx context.Context, command string, stdout, 
 		return nil
 	case err, _ := <-done:
 		if err != nil {
-			l.Printf("executing %q failed: %s", command, err)
+			err = errs.Wrapf(err, "failed to execute %q", command)
+			l.Error(err)
 			return err
 		}
 	}

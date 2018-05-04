@@ -103,7 +103,10 @@ func (info *runInfo) run() {
 		info.e.addComplete(info)
 	}()
 	info.start = time.Now()
-	info.j.f(ctx)
+	_, err := info.j.f(ctx)
+	if err != nil {
+		log.Println(info.Config().Name, "ended with an error:", err)
+	}
 }
 
 type executor struct {

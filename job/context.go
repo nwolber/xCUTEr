@@ -6,11 +6,12 @@ package job
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/nwolber/xCUTEr/logger"
+	errs "github.com/pkg/errors"
 )
 
 type acceptMsg struct {
@@ -18,33 +19,33 @@ type acceptMsg struct {
 	error
 }
 
-func accept(ctx context.Context, l net.Listener) <-chan acceptMsg {
-	c := make(chan acceptMsg)
-	go func(c chan<- acceptMsg, l net.Listener) {
-		for {
-			conn, err := l.Accept()
+func accept(ctx context.Context, listener net.Listener) <-chan acceptMsg {
+	l, ok := ctx.Value(LoggerKey).(logger.Logger)
+	if !ok || l == nil {
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
+	}
 
+	c := make(chan acceptMsg)
+	go func(l logger.Logger, c chan<- acceptMsg, listener net.Listener) {
+		for {
+			conn, err := listener.Accept()
+
+			err = errs.Wrap(err, "failed to accept from listener")
 			c <- acceptMsg{conn, err}
 
 			if err != nil {
-				log.Println("accept: listener errored", err)
+				l.Println("accept: listener errored", err)
 				close(c)
 				return
 			}
 		}
-	}(c, l)
+	}(l, c, listener)
 
-	go func(ctx context.Context, l net.Listener) {
+	go func(l logger.Logger, ctx context.Context, listener net.Listener) {
 		<-ctx.Done()
-		logger, ok := ctx.Value(LoggerKey).(logger.Logger)
-		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
-			log.Println(err)
-			return
-		}
-		logger.Println("closing listener")
-		l.Close()
-	}(ctx, l)
+		l.Println("closing listener")
+		listener.Close()
+	}(l, ctx, listener)
 
 	return c
 }

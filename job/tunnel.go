@@ -25,7 +25,7 @@ import (
 func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	listener, err := client.Listen("tcp", remoteAddr)
@@ -45,7 +45,7 @@ func forwardRemote(ctx context.Context, client *ssh.Client, remoteAddr string, l
 func forwardLocal(ctx context.Context, client *ssh.Client, remoteAddr string, localAddr string) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	listener, err := net.Listen("tcp", localAddr)
@@ -63,7 +63,7 @@ type dial func(network, address string) (net.Conn, error)
 func runTunnel(ctx context.Context, listener net.Listener, d dial, addr string) {
 	l, ok := ctx.Value(LoggerKey).(logger.Logger)
 	if !ok || l == nil {
-		l = log.New(os.Stderr, "", log.LstdFlags)
+		l = logger.New(log.New(os.Stderr, "", log.LstdFlags), false)
 	}
 
 	acceptChan := accept(ctx, listener)

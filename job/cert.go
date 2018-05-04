@@ -10,9 +10,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"io/ioutil"
 	"strings"
+
+	errs "github.com/pkg/errors"
 )
 
 const (
@@ -22,24 +23,24 @@ const (
 func readPrivateKeyFile(keyFile string, password []byte) (crypto.Signer, []byte, error) {
 	b, err := ioutil.ReadFile(keyFile)
 	if err != nil {
-		return nil, []byte{}, err
+		return nil, []byte{}, errs.Wrap(err, "failed to read file")
 	}
 
 	block, err := parsePEMBlock(b, pemBlockPrivateKey, password)
 	if err != nil {
-		return nil, []byte{}, err
+		return nil, []byte{}, errs.Wrapf(err, "failed to parse PEM block %s", pemBlockPrivateKey)
 	}
 
 	key, err := parsePrivateKey(block.Bytes)
 	if err != nil {
-		return nil, []byte{}, err
+		return nil, []byte{}, errs.Wrap(err, "failed to parse private key")
 	}
 
 	switch k := key.(type) {
 	case crypto.Signer:
 		return k, block.Bytes, nil
 	default:
-		return nil, []byte{}, errors.New("private key is no valid crypto.Signer")
+		return nil, []byte{}, errs.New("private key is no valid crypto.Signer")
 	}
 }
 
@@ -48,12 +49,12 @@ func parsePEMBlock(pemBlock []byte, typ string, password []byte) (*pem.Block, er
 	for {
 		keyDERBlock, pemBlock = pem.Decode(pemBlock)
 		if keyDERBlock == nil {
-			return nil, errors.New("can't read PEM block")
+			return nil, errs.New("can't read PEM block")
 		}
 		if x509.IsEncryptedPEMBlock(keyDERBlock) {
 			out, err := x509.DecryptPEMBlock(keyDERBlock, password)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err, "failed to decrypt PEM block")
 			}
 			keyDERBlock.Bytes = out
 			break
@@ -75,12 +76,12 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 		case *rsa.PrivateKey, *ecdsa.PrivateKey:
 			return key, nil
 		default:
-			return nil, errors.New("found unknown private key type in PKCS#8 wrapping")
+			return nil, errs.New("found unknown private key type in PKCS#8 wrapping")
 		}
 	}
 	if key, err := x509.ParseECPrivateKey(der); err == nil {
 		return key, nil
 	}
 
-	return nil, errors.New("failed to parse private key")
+	return nil, errs.New("failed to parse private key")
 }

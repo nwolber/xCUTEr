@@ -5,22 +5,25 @@
 package job
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
+
+	errs "github.com/pkg/errors"
 )
+
+type contextKey string
 
 const (
 	sequentialFlow = "sequential"
 	parallelFlow   = "parallel"
 
-	OutputKey     = "output"
-	LoggerKey     = "logger"
-	SshClientKey  = "sshClient"
-	TemplatingKey = "templating"
-	StdoutKey     = "stdout"
-	StderrKey     = "stderr"
+	OutputKey     contextKey = "output"
+	LoggerKey     contextKey = "logger"
+	SshClientKey  contextKey = "sshClient"
+	TemplatingKey contextKey = "templating"
+	StdoutKey     contextKey = "stdout"
+	StderrKey     contextKey = "stderr"
 )
 
 type ConfigBuilder interface {
@@ -55,11 +58,11 @@ type Group interface {
 
 func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Host == nil && c.HostsFile == nil {
-		return nil, errors.New("either 'host' or 'hostsFile' must be present")
+		return nil, errs.New("either 'host' or 'hostsFile' must be present")
 	}
 
 	if c.Host != nil && c.HostsFile != nil {
-		return nil, errors.New("either 'host' or 'hostsFile' may be present")
+		return nil, errs.New("either 'host' or 'hostsFile' may be present")
 	}
 
 	children := builder.Job(c.Name)
@@ -70,7 +73,7 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Timeout != "" {
 		timeout, err := time.ParseDuration(c.Timeout)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrapf(err, "failed to parse timeout %s", c.Timeout)
 		}
 		children.Append(builder.Timeout(timeout))
 	}
@@ -82,20 +85,20 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Pre != nil {
 		pre, err := visitCommand(builder, localCommand(c.Pre))
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrapf(err, "failed to visit pre command %+v", c.Pre)
 		}
 		children.Append(pre)
 	}
 
 	cmd, err := visitCommand(builder, c.Command)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrapf(err, "failed to visit command %+v", c.Command)
 	}
 
 	if c.Host != nil {
 		host, err := visitHost(builder, c, c.Host)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrapf(err, "failed to visit host", c.Host)
 		}
 		host.Append(cmd)
 		// Prevent errors from bubbling up and release resources, as soon as the host is done.
@@ -105,18 +108,18 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.HostsFile != nil {
 		hosts, err := readHostsFile(c.HostsFile)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrap(err, "failed to read hosts file")
 		}
 
 		hostFluncs := builder.Hosts()
 		for _, host := range hosts {
-			host, err := visitHost(builder, c, host)
+			h, err := visitHost(builder, c, host)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrapf(err, "failed to visit host %s", host)
 			}
-			host.Append(cmd)
+			h.Append(cmd)
 			// Prevent errors from bubbling up and release resources, as soon as the host is done.
-			hostFluncs.Append(builder.ErrorSafeguard(builder.ContextBounds(host.Wrap())))
+			hostFluncs.Append(builder.ErrorSafeguard(builder.ContextBounds(h.Wrap())))
 		}
 		children.Append(hostFluncs.Wrap())
 	}
@@ -124,7 +127,7 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Post != nil {
 		post, err := visitCommand(builder, localCommand(c.Post))
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrapf(err, "failed to visit post command %+v", c.Post)
 		}
 		children.Append(post)
 	}
@@ -156,7 +159,7 @@ func localCommand(c *Command) *Command {
 
 func visitHost(builder ConfigBuilder, c *Config, host *Host) (Group, error) {
 	if c.Command == nil {
-		return nil, errors.New("config does not contain any commands")
+		return nil, errs.New("config does not contain any commands")
 	}
 
 	children := builder.Host(c, host)
@@ -183,8 +186,7 @@ func visitCommand(builder ConfigBuilder, cmd *Command) (interface{}, error) {
 	)
 
 	if cmd.Command != "" && cmd.Commands != nil && len(cmd.Commands) > 0 {
-		err := fmt.Errorf("either command or commands can be present in %s", cmd)
-		return nil, err
+		return nil, errs.Errorf("either command or commands can be present in %+v", cmd)
 	}
 
 	var stdout, stderr interface{}
@@ -214,14 +216,13 @@ func visitCommand(builder ConfigBuilder, cmd *Command) (interface{}, error) {
 	} else if cmd.Commands != nil && len(cmd.Commands) > 0 {
 		childCommands, err := visitCommands(builder, cmd)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrapf(err, "fail to visit child command %+v", cmd)
 		}
 
 		cmds = childCommands.Wrap()
 	} else {
-		err := fmt.Errorf("either 'command' or 'commands' has to be specified")
+		err := errs.New("either 'command' or 'commands' has to be specified")
 		log.Println(err)
-
 		return nil, err
 	}
 
@@ -248,7 +249,7 @@ func visitCommands(builder ConfigBuilder, cmd *Command) (Group, error) {
 	} else if cmd.Flow == parallelFlow {
 		childCommands = builder.Parallel()
 	} else {
-		err := fmt.Errorf("unknown flow %q", cmd.Flow)
+		err := errs.Errorf("unknown flow %q", cmd.Flow)
 		log.Println(err)
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func visitCommands(builder ConfigBuilder, cmd *Command) (Group, error) {
 	for _, cmd := range cmd.Commands {
 		exec, err := visitCommand(builder, cmd)
 		if err != nil {
-			return nil, err
+			return nil, errs.Wrap(err, "failed to visit commands")
 		}
 
 		childCommands.Append(exec)

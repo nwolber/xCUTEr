@@ -170,3 +170,19 @@ func (l *telemetryLogger) Output(calldepth int, s string) error {
 	}
 	return l.orig.Output(calldepth+1, s)
 }
+
+func (l *telemetryLogger) Error(v ...interface{}) {
+	s := fmt.Sprint(v...)
+	l.Log(time.Now(), s)
+	if l.orig != nil {
+		l.orig.Output(calldepth, s)
+	}
+}
+
+func (l *telemetryLogger) Errorf(format string, v ...interface{}) {
+	s := fmt.Sprintf(format, v...)
+	l.Log(time.Now(), s)
+	if l.orig != nil {
+		l.orig.Output(calldepth, s)
+	}
+}

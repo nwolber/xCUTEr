@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 	"unicode"
+
+	errs "github.com/pkg/errors"
 )
 
 // Config is the in-memory representation of a job configuration.
@@ -37,13 +39,17 @@ type Config struct {
 }
 
 func (c *Config) String() string {
-	return c.Tree(true, false, 1, 0)
+	s, err := c.Tree(true, false, 1, 0)
+	if err != nil {
+		log.Panicln("failed to turn config into string:", err)
+	}
+	return s
 }
 
 // Tree returns a textual representation of the Config's execution tree.
 // When full is true, housekeeping steps are included. When raw is true,
 // template string are output in the un-interpolated form.
-func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
+func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) (string, error) {
 	f, err := VisitConfig(&StringBuilder{
 		Full:        full,
 		Raw:         raw,
@@ -51,7 +57,7 @@ func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 		MaxCommands: maxCommands,
 	}, c)
 	if err != nil {
-		log.Panicln(err)
+		return "", errs.Wrap(err, "failed to run visitor")
 	}
 
 	return f.(Stringer).String(&Vars{
@@ -61,7 +67,7 @@ func (c *Config) Tree(full, raw bool, maxHosts, maxCommands int) string {
 				return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 			},
 		},
-	})
+	}), nil
 }
 
 // JSON generates the Config's JSON representation.
@@ -93,6 +99,13 @@ type Host struct {
 	Password            string            `json:"password,omitempty"`
 	KeyboardInteractive map[string]string `json:"keyboardInteractive,omitempty"`
 	Tags                map[string]string `json:"tags,omitempty"`
+}
+
+func (h *Host) String() string {
+	if h.Name != "" {
+		return h.Name
+	}
+	return fmt.Sprintf("%s:%s", h.Addr, h.Port)
 }
 
 // Output describes a file used for output in different scenarios such as
@@ -133,7 +146,7 @@ func (o *Output) UnmarshalJSON(b []byte) error {
 
 	var obj map[string]interface{}
 	if err := json.Unmarshal(b, &obj); err != nil {
-		return err
+		return errs.Wrap(err, "failed to unmarshal output")
 	}
 
 	for k, v := range obj {
@@ -145,7 +158,7 @@ func (o *Output) UnmarshalJSON(b []byte) error {
 		case "overwrite":
 			o.Overwrite = v.(bool)
 		default:
-			return fmt.Errorf("output has no property '%s'", k)
+			return errs.Errorf("output has no property '%s'", k)
 		}
 	}
 
@@ -167,6 +180,10 @@ type ScpData struct {
 	Port    uint   `json:"port,omitempty"`
 	Key     string `json:"key,omitempty"`
 	Verbose bool   `json:"verbose,omitempty"`
+}
+
+func (s *ScpData) String() string {
+	return fmt.Sprintf("%s:%d", s.Addr, s.Port)
 }
 
 // Command describes a command that can be executed on the client or a remote
@@ -243,13 +260,13 @@ func parseConfig(r io.Reader) (*Config, error) {
 		closer.Close()
 	}
 
-	return &c, err
+	return &c, errs.Wrap(err, "failed to decode config")
 }
 
 func readHostsFile(file *hostsFile) (hostConfig, error) {
 	f, err := os.Open(file.File)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrapf(err, "failed to open file %s", file.File)
 	}
 	defer f.Close()
 
@@ -262,7 +279,7 @@ func parseHostsFile(r io.Reader, pattern, matchString string) (hostConfig, error
 
 	var hosts hostConfig
 	if err := d.Decode(&hosts); err != nil {
-		return nil, err
+		return nil, errs.Wrapf(err, "failed to decode hosts file")
 	}
 
 	return filterHosts(hosts, pattern, matchString)
@@ -274,7 +291,7 @@ func parseHostsFile(r io.Reader, pattern, matchString string) (hostConfig, error
 func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(err, "failed to compile hosts pattern")
 	}
 
 	filteredHosts := make(hostConfig)
@@ -287,7 +304,7 @@ func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, err
 		if matchString != "" {
 			str, err = interpolate(matchString, host)
 			if err != nil {
-				return nil, fmt.Errorf("string interpolation failed for match string %q and host %#v: %s", matchString, host, err)
+				return nil, errs.Wrapf(err, "string interpolation failed for match string %q and host %#v", matchString, host)
 			}
 
 			if matchString == "" {
@@ -305,12 +322,12 @@ func filterHosts(hosts hostConfig, pattern, matchString string) (hostConfig, err
 func interpolate(text string, h *Host) (string, error) {
 	t, err := template.New("").Parse(text)
 	if err != nil {
-		return "", err
+		return "", errs.Wrap(err, "failed to parse template")
 	}
 
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, h); err != nil {
-		return "", err
+		return "", errs.Wrap(err, "failed to execute interpolation")
 	}
 
 	return buf.String(), nil

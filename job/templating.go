@@ -11,6 +11,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	errs "github.com/pkg/errors"
 )
 
 // A TemplatingEngine can treat templating strings as defined by the Go
@@ -64,7 +66,7 @@ func (t *TemplatingEngine) Interpolate(templ string) (string, error) {
 
 	tt, err := tt.Parse(templ)
 	if err != nil {
-		return "", err
+		return "", errs.Wrap(err, "failed to parse template")
 	}
 
 	data := struct {
@@ -81,7 +83,7 @@ func (t *TemplatingEngine) Interpolate(templ string) (string, error) {
 
 	err = tt.Execute(&buf, data)
 	if err != nil {
-		return "", err
+		return "", errs.Wrap(err, "failed to execute template")
 	}
 
 	return buf.String(), nil

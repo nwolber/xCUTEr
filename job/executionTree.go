@@ -18,6 +18,7 @@ import (
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/logger"
+	errs "github.com/pkg/errors"
 )
 
 // ExecutionTree creates the execution tree necessary to executeCommand
@@ -25,7 +26,7 @@ import (
 func (c *Config) ExecutionTree() (flunc.Flunc, error) {
 	f, err := VisitConfig(&ExecutionTreeBuilder{}, c)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(err, "failed to visit config")
 	}
 
 	return f.(flunc.Flunc), nil
@@ -93,21 +94,20 @@ func (*ExecutionTreeBuilder) Output(o *Output) interface{} {
 		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 
 		if !ok {
-			err := fmt.Errorf("no %s available", TemplatingKey)
-			log.Println(err)
+			err := errs.Errorf("error during output setup: no %s available", TemplatingKey)
 			return nil, err
 		}
 
 		var err error
 		file, err := tt.Interpolate(o.File)
 		if err != nil {
-			log.Println("error parsing template string", file, err)
+			err = errs.Wrap(err, "error during output setup: failed to interpolate output template string")
 			return nil, err
 		}
 
 		f, err := openOutputFile(file, o.Raw, o.Overwrite)
 		if err != nil {
-			err = fmt.Errorf("unable to open job output file %s %s", file, err)
+			err = errs.Wrapf(err, "error during output setup: unable to open output file for job %s", file)
 			return nil, err
 		}
 
@@ -135,8 +135,7 @@ func openOutputFile(file string, raw, overwrite bool) (*os.File, error) {
 
 	f, err := os.OpenFile(file, flags, os.FileMode(0644))
 	if err != nil {
-
-		return nil, err
+		return nil, errs.WithStack(err)
 	}
 
 	if !raw {
@@ -156,12 +155,11 @@ func (e *ExecutionTreeBuilder) JobLogger(jobName string) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", OutputKey)
-			log.Println(err)
+			err := errs.Errorf("error while setting up job-level logger: no %s available", OutputKey)
 			return nil, err
 		}
 
-		return context.WithValue(ctx, LoggerKey, log.New(output, jobName+": ", log.Flags())), nil
+		return context.WithValue(ctx, LoggerKey, logger.New(log.New(output, jobName+": ", log.Flags()), false)), nil
 	})
 }
 
@@ -173,8 +171,7 @@ func (e *ExecutionTreeBuilder) HostLogger(hostName string, h *Host) interface{} 
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		output, ok := ctx.Value(OutputKey).(io.Writer)
 		if !ok {
-			err := fmt.Errorf("no %s available", OutputKey)
-			log.Println(err)
+			err := errs.Errorf("error while setting up host-level logger: no %s available", OutputKey)
 			return nil, err
 		}
 
@@ -183,7 +180,7 @@ func (e *ExecutionTreeBuilder) HostLogger(hostName string, h *Host) interface{} 
 			name = fmt.Sprintf("%s@%s:%d", h.User, h.Addr, h.Port)
 		}
 
-		logger := log.New(output, fmt.Sprintf("%s - %s: ", hostName, name), log.Flags())
+		logger := logger.New(log.New(output, fmt.Sprintf("%s - %s: ", hostName, name), log.Flags()), false)
 		logger.Println("logger created")
 		return context.WithValue(ctx, LoggerKey, logger), nil
 	})
@@ -197,8 +194,7 @@ func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
-			log.Println(err)
+			err := errs.Errorf("error while setting up %s timeout: no %s available", timeout, LoggerKey)
 			return nil, err
 		}
 
@@ -206,6 +202,14 @@ func (e *ExecutionTreeBuilder) Timeout(timeout time.Duration) interface{} {
 		// automatically when the job ends
 		ctx, _ = context.WithTimeout(ctx, timeout)
 		l.Println("set timeout to", timeout)
+
+		go func(ctx context.Context) {
+			<-ctx.Done()
+			if ctx.Err() == context.DeadlineExceeded {
+				l.Println("timeout exceeded")
+			}
+		}(ctx)
+
 		return ctx, nil
 	})
 }
@@ -218,14 +222,14 @@ func (e *ExecutionTreeBuilder) SCP(scp *ScpData) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
-			log.Println(err)
+			err := errs.Errorf("error while setting up scp to %s: no %s available", scp, LoggerKey)
 			return nil, err
 		}
 
 		b, err := ioutil.ReadFile(scp.Key)
 		if err != nil {
-			l.Println("failed reading key file", err)
+			err = errs.Wrapf(err, "error while setting up scp to %s: failed to read key file %s", scp, scp.Key)
+			l.Println(err)
 			return nil, err
 		}
 
@@ -260,14 +264,14 @@ func (e *ExecutionTreeBuilder) ErrorSafeguard(child interface{}) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up error safeguard: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		ctx, err := f(ctx)
 		if err != nil {
-			l.Println(err)
+			l.Println("safeguard caught an error:", err)
 			return nil, nil
 		}
 		return ctx, nil
@@ -307,7 +311,7 @@ func (e *ExecutionTreeBuilder) Retry(child interface{}, numRetries uint) interfa
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up retry: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -347,7 +351,7 @@ func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, key
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up ssh to %s@%s: no %s available", host, user, LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
@@ -355,7 +359,8 @@ func (*ExecutionTreeBuilder) SSHClient(host, user, keyFile, password string, key
 		l.Println("connecting to", host)
 		s, err := newSSHClient(ctx, host, user, keyFile, password, keyboardInteractive)
 		if err != nil {
-			l.Println("ssh client setup failed", err)
+			err = errs.Wrapf(err, "ssh client setup to %s@%s failed", host, user)
+			l.Println(err)
 			return nil, err
 		}
 		l.Println("connected to", host)
@@ -372,14 +377,14 @@ func (*ExecutionTreeBuilder) Forwarding(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up forwarding: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", SshClientKey)
+			return nil, errs.Errorf("error while setting up forwarding: no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -399,14 +404,14 @@ func (*ExecutionTreeBuilder) Tunnel(f *Forwarding) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up tunnel: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", SshClientKey)
+			return nil, errs.Errorf("error while setting up tunnel: no %s available", SshClientKey)
 		}
 
 		remoteAddr := fmt.Sprintf("%s:%d", f.RemoteHost, f.RemotePort)
@@ -432,27 +437,27 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up command: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		s, ok := ctx.Value(SshClientKey).(*sshClient)
 		if !ok {
-			return nil, fmt.Errorf("no %s available", SshClientKey)
+			return nil, errs.Errorf("error while setting up command: no %s available", SshClientKey)
 		}
 
 		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
-
 		if !ok {
-			err := fmt.Errorf("no %s available", TemplatingKey)
+			err := errs.Errorf("error while setting up command: no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		command, err := tt.Interpolate(cmd.Command)
 		if err != nil {
-			l.Println("error parsing template string", cmd.Command, err)
+			err = errs.Wrapf(err, "error parsing command %s", cmd.Command)
+			l.Println(err)
 			return nil, err
 		}
 
@@ -467,7 +472,7 @@ func (*ExecutionTreeBuilder) Command(cmd *Command) interface{} {
 		}
 
 		err = s.executeCommand(ctx, command, stdout, stderr)
-		return nil, err
+		return nil, errs.Wrap(err, "failed to remote command")
 	})
 }
 
@@ -481,27 +486,29 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 	return flunc.MakeFlunc(func(ctx context.Context) (context.Context, error) {
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up local command: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", TemplatingKey)
+			err := errs.Errorf("error while setting up local command: no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		command, err := tt.Interpolate(cmd.Command)
 		if err != nil {
-			l.Println("error parsing template string", cmd.Command, err)
+			err = errs.Wrapf(err, "error parsing command %s", cmd.Command)
+			l.Println(err)
 			return nil, err
 		}
 
 		parts, err := shellwords.Parse(command)
 		if err != nil {
-			l.Println("error parsing command line", cmd.Command, err)
+			err = errs.Wrapf(err, "error parsing command line %s", cmd.Command)
+			l.Println(err)
 			return nil, err
 		}
 		exe := parts[0]
@@ -527,7 +534,8 @@ func (*ExecutionTreeBuilder) LocalCommand(cmd *Command) interface{} {
 
 		l.Println("executing local command", command)
 		if err := cmd.Run(); err != nil {
-			l.Printf("error running %q locally: %s", command, err)
+			err = errs.Wrapf(err, "error running %q locally", command)
+			l.Println(err)
 			return nil, err
 		}
 		l.Printf("%q completed successfully", command)
@@ -548,26 +556,28 @@ func (e *ExecutionTreeBuilder) Stdout(o *Output) interface{} {
 
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := errs.Errorf("error while setting up STDOUT redirect: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", TemplatingKey)
+			err := errs.Errorf("error while setting up STDOUT redirect: no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		path, err := tt.Interpolate(o.File)
 		if err != nil {
-			l.Println("error parsing template string", o.File, err)
+			err = errs.Wrapf(err, "error parsing stdout %s", o.File)
+			l.Println(err)
 			return nil, err
 		}
+
 		f, err := openOutputFile(path, o.Raw, o.Overwrite)
 		if err != nil {
-			err = fmt.Errorf("unable to open stdout file: %s", err)
+			err = errs.Wrapf(err, "unable to open stdout file %s", o.File)
 			l.Println(err)
 			return nil, err
 		}
@@ -596,27 +606,28 @@ func (*ExecutionTreeBuilder) Stderr(o *Output) interface{} {
 
 		l, ok := ctx.Value(LoggerKey).(logger.Logger)
 		if !ok {
-			err := fmt.Errorf("no %s available", LoggerKey)
+			err := fmt.Errorf("error while setting up STDERR redirect: no %s available", LoggerKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		tt, ok := ctx.Value(TemplatingKey).(*TemplatingEngine)
 		if !ok {
-			err := fmt.Errorf("no %s available", TemplatingKey)
+			err := fmt.Errorf("error while setting up STDERR redirect: no %s available", TemplatingKey)
 			log.Println(err)
 			return nil, err
 		}
 
 		path, err := tt.Interpolate(o.File)
 		if err != nil {
-			l.Println("error parsing template string", o.File, err)
+			err = errs.Wrapf(err, "error parsing stderr %s", o.File)
+			l.Println(err)
 			return nil, err
 		}
-		f, err := openOutputFile(path, o.Raw, o.Overwrite)
 
+		f, err := openOutputFile(path, o.Raw, o.Overwrite)
 		if err != nil {
-			err = fmt.Errorf("unable to open stdout file: %s", err)
+			err = errs.Wrapf(err, "unable to open stderr file %s", o.File)
 			l.Println(err)
 			return nil, err
 		}

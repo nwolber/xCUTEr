@@ -4,7 +4,11 @@
 
 package logger
 
-import "io"
+import (
+	"fmt"
+	"io"
+	"log"
+)
 
 // Logger is an interface for loggers. It is satisfied by log.Logger.
 type Logger interface {
@@ -23,4 +27,42 @@ type Logger interface {
 	Panicf(format string, v ...interface{})
 	Panicln(v ...interface{})
 	Output(calldepth int, s string) error
+	Error(v ...interface{})
+	Errorf(format string, v ...interface{})
+}
+
+type errorLogger struct {
+	*log.Logger
+	printStack bool
+}
+
+func New(logger *log.Logger, printStack bool) Logger {
+	return &errorLogger{
+		Logger:     logger,
+		printStack: printStack,
+	}
+}
+
+func (l *errorLogger) Error(v ...interface{}) {
+	if l.printStack {
+		for i, vv := range v {
+			if err, ok := vv.(error); ok {
+				v[i] = fmt.Sprintf("%+v", err)
+			}
+		}
+	}
+
+	l.Logger.Println(v...)
+}
+
+func (l *errorLogger) Errorf(format string, v ...interface{}) {
+	if l.printStack {
+		for i, vv := range v {
+			if err, ok := vv.(error); ok {
+				v[i] = fmt.Sprintf("%+v", err)
+			}
+		}
+	}
+
+	l.Logger.Printf(format, v...)
 }
