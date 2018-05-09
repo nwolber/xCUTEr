@@ -338,12 +338,12 @@ Only meaningful together with `commands`.
 Either empty for hosts or `local` to execute on the machine xCUTEr is running on.
 * retries: How often to retry a failed command.
 * ignoreError: Wether to continue execution, even if the command failed.
+* timeout: Timeout when the current command and all child commands are canceled.
 * stdout: File where to redirect STDOUT of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDOUT.
 Supports the same extended form as *[output](#output)*.
 Supports *[templating](#templating)*.
-* timeout: Timeout when the current command and all child commands are canceled.
 * stderr: File where to redirect STDERR of the command and subcommands.
 Inherited output files can be overriden by subcommands.
 The special value ```null``` discards any output written to STDERR.
