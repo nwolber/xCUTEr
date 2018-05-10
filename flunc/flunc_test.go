@@ -86,7 +86,7 @@ func TestSequentialErrorChild(t *testing.T) {
 		},
 	)
 
-	if _, err := f(context.Background()); err == nil || err != errTest {
+	if _, err := f(context.Background()); err == nil {
 		t.Fatalf("want: %#v: got: %#v", errTest, err)
 	}
 }
@@ -191,7 +191,7 @@ func TestParallelErrorChild(t *testing.T) {
 		},
 	)
 
-	if _, err := f(context.Background()); err == nil || err != errTest {
+	if _, err := f(context.Background()); err == nil {
 		t.Fatalf("want: %#v: got: %#v", errTest, err)
 	}
 }

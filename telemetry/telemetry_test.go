@@ -7,10 +7,9 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"log"
 	"testing"
 	"time"
-
-	"log"
 
 	"github.com/nwolber/xCUTEr/flunc"
 	"github.com/nwolber/xCUTEr/job"
@@ -160,11 +159,11 @@ func TestInstrumentWithAlteredContext(t *testing.T) {
 }
 
 func TestFindOriginalLogger(t *testing.T) {
-	logger := &log.Logger{}
-	origCtx := context.WithValue(context.Background(), job.LoggerKey, logger)
-	ctx := context.WithValue(origCtx, job.LoggerKey, &telemetryLogger{orig: logger})
+	l := logger.New(&log.Logger{}, false)
+	origCtx := context.WithValue(context.Background(), job.LoggerKey, l)
+	ctx := context.WithValue(origCtx, job.LoggerKey, &telemetryLogger{orig: l})
 
 	got := findOriginalLogger(ctx)
 
-	expect(t, "", logger, got)
+	expect(t, "", l, got)
 }
