@@ -3,6 +3,7 @@ package job
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"testing"
 )
 
@@ -89,4 +90,101 @@ func TestFilterHosts(t *testing.T) {
 	got, err := filterHosts(hosts, pattern, matchString)
 	expect(t, nil, err)
 	expect(t, 1, len(got))
+}
+
+func TestRemoveLineComments(t *testing.T) {
+	type args struct {
+		input     string
+		indicator string
+	}
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "full line comment",
+			input: "// foo bar",
+			want:  "",
+		},
+		{
+			name:  "full line comment with no space after indicator",
+			input: "//foo bar",
+			want:  "",
+		},
+		{
+			name:  "full line comment with preceding tabs",
+			input: "\t\t\t// foo bar",
+			want:  "\t\t\t",
+		},
+		{
+			name:  "full line comment with preceding tabs and no space after indicator",
+			input: "\t\t\t//foo bar",
+			want:  "\t\t\t",
+		},
+		{
+			name:  "full line comment with preceding spaces",
+			input: "                 // foo bar",
+			want:  "                 ",
+		},
+		{
+			name:  "full line comment with preceding spaces and no space after indicator",
+			input: "                 //foo bar",
+			want:  "                 ",
+		},
+		{
+			name:  "comment at the end",
+			input: "\"biz\": \"baz\" // foo bar",
+			want:  "\"biz\": \"baz\" ",
+		},
+		{
+			name:  "comment at the end with no space after indicator",
+			input: "\"biz\": \"baz\" //foo bar",
+			want:  "\"biz\": \"baz\" ",
+		},
+		{
+			name:  "comment at the end with no space before and after indicator",
+			input: "\"biz\": \"baz\"//foo bar",
+			want:  "\"biz\": \"baz\"",
+		},
+		{
+			name:  "line with indicator in string token",
+			input: "\"foo\": \"foo//bar\"",
+			want:  "\"foo\": \"foo//bar\"",
+		},
+		{
+			name:  "line with indicator in string token and multiple properties in one line",
+			input: "\"bla\": 123, \"foo\": \"foo//bar\", \"biz\": \"baz\"",
+			want:  "\"bla\": 123, \"foo\": \"foo//bar\", \"biz\": \"baz\"",
+		},
+		{
+			name:  "line with url",
+			input: "\"foo\": \"https://example.com/\"",
+			want:  "\"foo\": \"https://example.com/\"",
+		},
+		{
+			name:  "line with url and comment",
+			input: "\"foo\": \"https://example.com/\" // biz baz",
+			want:  "\"foo\": \"https://example.com/\" ",
+		},
+		{
+			name:  "double quotes in string literal",
+			input: "\"foo\": \"bla\\\"\" // biz baz",
+			want:  "\"foo\": \"bla\\\"\" ",
+		},
+	}
+
+	const indicator = "//"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := removeLineComments(bytes.NewBufferString(tt.input), indicator)
+			b, err := ioutil.ReadAll(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := string(b); got != tt.want {
+				t.Errorf("removeLineComments() = '%v', want '%v'", got, tt.want)
+			}
+		})
+	}
 }

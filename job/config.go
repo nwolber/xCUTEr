@@ -16,7 +16,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-	"unicode"
 
 	errs "github.com/pkg/errors"
 )
@@ -105,7 +104,7 @@ func (h *Host) String() string {
 	if h.Name != "" {
 		return h.Name
 	}
-	return fmt.Sprintf("%s:%s", h.Addr, h.Port)
+	return fmt.Sprintf("%s:%d", h.Addr, h.Port)
 }
 
 // Output describes a file used for output in different scenarios such as
@@ -218,26 +217,36 @@ const (
 	shellLineComments = "#"
 )
 
-var (
-	commentRegex *regexp.Regexp
-)
-
-// removeLineComments removes any line from r that starts with indictor
-// after removing preceding whitespace (according to unicode.IsSpace).
+// removeLineComments removes all text following the indicator string.
+// It ignores occurances of the indicator string in JSON string literals.
 func removeLineComments(reader io.Reader, indicator string) io.ReadCloser {
 	s := bufio.NewScanner(reader)
 	r, w := io.Pipe()
 
-	if commentRegex == nil {
-		commentRegex = regexp.MustCompile("\\s*\\/\\/.*")
-	}
-
 	go func() {
 		for s.Scan() {
-			line := strings.TrimLeftFunc(s.Text(), unicode.IsSpace)
-			line = commentRegex.ReplaceAllString(line, "")
+			line := s.Text()
 
-			if _, err := fmt.Fprintln(w, line); err != nil {
+			// idea: JSON string literals may not span multiple lines
+			// therefore if there is an uneven number of double quotes before the indicator we are in a string literal,
+			// thus no indicator to remove (neither RFC 8259 nor ECMA-404 allow another delimiter for string literals
+			// then double quotes ASCII 0x22)
+			for start := 0; start < len(line); {
+				indicatorPos := strings.Index(line[start:], indicator)
+				if indicatorPos == -1 {
+					break
+				}
+				indicatorPos += start
+				numDoubleQuotes := strings.Count(line[:indicatorPos], "\"") - strings.Count(line[:indicatorPos], "\\\"")
+
+				if numDoubleQuotes%2 == 0 {
+					line = line[:indicatorPos]
+					break
+				}
+				start = indicatorPos + len(indicator)
+			}
+
+			if _, err := fmt.Fprint(w, line); err != nil {
 				w.CloseWithError(err)
 				return
 			}
