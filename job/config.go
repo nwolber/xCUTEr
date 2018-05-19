@@ -185,19 +185,38 @@ func (s *ScpData) String() string {
 	return fmt.Sprintf("%s:%d", s.Addr, s.Port)
 }
 
+type CommandTarget string
+
+const CommandTargetLocal CommandTarget = "local"
+
 // Command describes a command that can be executed on the client or a remote
 // host connected via SSH.
 type Command struct {
-	Name        string     `json:"name,omitempty"`
-	Command     string     `json:"command,omitempty"`
-	Commands    []*Command `json:"commands,omitempty"`
-	Flow        string     `json:"flow,omitempty"`
-	Target      string     `json:"target,omitempty"`
-	Retries     uint       `json:"retries,omitempty"`
-	Timeout     string     `json:"timeout,omitempty"`
-	IgnoreError bool       `json:"ignoreError,omitempty"`
-	Stdout      *Output    `json:"stdout,omitempty"`
-	Stderr      *Output    `json:"stderr,omitempty"`
+	Name        string        `json:"name,omitempty"`
+	Command     string        `json:"command,omitempty"`
+	Commands    []*Command    `json:"commands,omitempty"`
+	Flow        string        `json:"flow,omitempty"`
+	Target      CommandTarget `json:"target,omitempty"`
+	Retries     uint          `json:"retries,omitempty"`
+	Timeout     string        `json:"timeout,omitempty"`
+	IgnoreError bool          `json:"ignoreError,omitempty"`
+	Stdout      *Output       `json:"stdout,omitempty"`
+	Stderr      *Output       `json:"stderr,omitempty"`
+}
+
+// IsRemote returns true if either the command or any of its child commands are executed on the remote.
+func (c *Command) IsRemote() bool {
+	if c.Command != "" && c.Target != CommandTargetLocal {
+		return true
+	}
+
+	for _, child := range c.Commands {
+		if child.IsRemote() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ReadConfig parses the file into a Config.

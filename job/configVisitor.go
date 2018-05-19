@@ -165,15 +165,27 @@ func visitHost(builder ConfigBuilder, c *Config, host *Host) (Group, error) {
 	children := builder.Host(c, host)
 	children.Append(builder.HostLogger(c.Name, host))
 	children.Append(builder.Templating(c, host))
-	children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port),
-		host.User, host.PrivateKey, host.Password, host.KeyboardInteractive))
+
+	isRemote := c.Command.IsRemote()
+	if isRemote {
+		children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port),
+			host.User, host.PrivateKey, host.Password, host.KeyboardInteractive))
+	}
 
 	if f := c.Forwarding; f != nil {
-		children.Append(builder.Forwarding(f))
+		if isRemote {
+			children.Append(builder.Forwarding(f))
+		} else {
+			return nil, errs.New("job specifies forwarding although all commands have target 'local'")
+		}
 	}
 
 	if t := c.Tunnel; t != nil {
-		children.Append(builder.Tunnel(t))
+		if isRemote {
+			children.Append(builder.Tunnel(t))
+		} else {
+			return nil, errs.New("job specifies tunneling although all commands have target 'local'")
+		}
 	}
 
 	return children, nil
