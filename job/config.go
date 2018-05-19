@@ -206,7 +206,7 @@ type Command struct {
 
 // IsRemote returns true if either the command or any of its child commands are executed on the remote.
 func (c *Command) IsRemote() bool {
-	if c.Target != CommandTargetLocal {
+	if c.Command != "" && c.Target != CommandTargetLocal {
 		return true
 	}
 
