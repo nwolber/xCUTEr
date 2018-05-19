@@ -165,8 +165,11 @@ func visitHost(builder ConfigBuilder, c *Config, host *Host) (Group, error) {
 	children := builder.Host(c, host)
 	children.Append(builder.HostLogger(c.Name, host))
 	children.Append(builder.Templating(c, host))
-	children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port),
-		host.User, host.PrivateKey, host.Password, host.KeyboardInteractive))
+
+	if c.Command.IsRemote() {
+		children.Append(builder.SSHClient(fmt.Sprintf("%s:%d", host.Addr, host.Port),
+			host.User, host.PrivateKey, host.Password, host.KeyboardInteractive))
+	}
 
 	if f := c.Forwarding; f != nil {
 		children.Append(builder.Forwarding(f))
