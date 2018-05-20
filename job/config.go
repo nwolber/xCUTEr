@@ -265,7 +265,7 @@ func removeLineComments(reader io.Reader, indicator string) io.ReadCloser {
 				start = indicatorPos + len(indicator)
 			}
 
-			if _, err := fmt.Fprint(w, line); err != nil {
+			if _, err := w.Write([]byte(line)); err != nil {
 				w.CloseWithError(err)
 				return
 			}
