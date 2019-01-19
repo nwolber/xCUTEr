@@ -254,7 +254,7 @@ File name where to find host definitions as well as a pattern to match against h
 "hosts": {
     "file": "hosts.json",
     "pattern": "Debian_DB",
-    "matchString": "{{.Tags.os}}_{{.Tags.app}}
+    "matchString": "{{.Tags.os}}_{{.Tags.app}}"
 }
 ```
 * file: File name or path of the hosts file.
@@ -262,6 +262,18 @@ File name where to find host definitions as well as a pattern to match against h
 The syntax can be found [here](https://godoc.org/regexp/syntax).
 * matchString: If present used instead of the hosts `Name`field for pattern matching against `pattern`.
 Supports templating with any field from the host, including tags.
+
+*Alternativly an array of hosts file structures may be given*
+```json
+"hosts": [{
+    "file": "hosts.json",
+    "pattern": "Debian_DB",
+    "matchString": "{{.Tags.os}}_{{.Tags.app}}"
+}, {
+    "file": "other_hosts.json",
+    "pattern": "server.*"
+}]
+```
 
 ##### Forwarding and Tunneling
 Forwarding instructs the host to open a tunnel from the host to the machine xCUTEr is running on.

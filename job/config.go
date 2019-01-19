@@ -22,19 +22,19 @@ import (
 
 // Config is the in-memory representation of a job configuration.
 type Config struct {
-	Name       string      `json:"name,omitempty"`
-	Schedule   string      `json:"schedule,omitempty"`
-	Timeout    string      `json:"timeout,omitempty"`
-	Telemetry  bool        `json:"telemetry,omitempty"`
-	Output     *Output     `json:"output,omitempty"`
-	Host       *Host       `json:"host,omitempty"`
-	HostsFile  *hostsFile  `json:"hosts,omitempty"`
-	Pre        *Command    `json:"pre,omitempty"`
-	Command    *Command    `json:"command,omitempty"`
-	Post       *Command    `json:"post,omitempty"`
-	Forwarding *Forwarding `json:"forwarding,omitempty"`
-	Tunnel     *Forwarding `json:"tunnel,omitempty"`
-	SCP        *ScpData    `json:"scp,omitempty"`
+	Name       string           `json:"name,omitempty"`
+	Schedule   string           `json:"schedule,omitempty"`
+	Timeout    string           `json:"timeout,omitempty"`
+	Telemetry  bool             `json:"telemetry,omitempty"`
+	Output     *Output          `json:"output,omitempty"`
+	Host       *Host            `json:"host,omitempty"`
+	HostsFile  hostsFileOrArray `json:"hosts,omitempty"`
+	Pre        *Command         `json:"pre,omitempty"`
+	Command    *Command         `json:"command,omitempty"`
+	Post       *Command         `json:"post,omitempty"`
+	Forwarding *Forwarding      `json:"forwarding,omitempty"`
+	Tunnel     *Forwarding      `json:"tunnel,omitempty"`
+	SCP        *ScpData         `json:"scp,omitempty"`
 }
 
 func (c *Config) String() string {
@@ -85,6 +85,35 @@ type hostsFile struct {
 	File        string `json:"file,omitempty"`
 	Pattern     string `json:"pattern,omitempty"`
 	MatchString string `json:"matchString,omitempty"`
+}
+
+type hostsFileOrArray []*hostsFile
+
+func (f hostsFileOrArray) MarshalJSON() ([]byte, error) {
+	switch len(f) {
+	case 0:
+		return json.Marshal(nil)
+	case 1:
+		return json.Marshal(f[0])
+	default:
+		return json.Marshal([]*hostsFile(f))
+	}
+}
+
+func (f hostsFileOrArray) UnmarshalJSON(b []byte) error {
+	var file hostsFile
+	if err := json.Unmarshal(b, &file); err == nil {
+		f = append(f, &file)
+		return nil
+	}
+
+	var arr []*hostsFile
+	if err := json.Unmarshal(b, &arr); err != nil {
+		return err
+	}
+
+	f = arr
+	return nil
 }
 
 // Host holds all information about a host such as its address and means to
@@ -290,6 +319,22 @@ func parseConfig(r io.Reader) (*Config, error) {
 	}
 
 	return &c, errs.Wrap(err, "failed to decode config")
+}
+
+func readHostsFiles(files hostsFileOrArray) (hostConfig, error) {
+	config := make(hostConfig)
+	for _, file := range files {
+		c, err := readHostsFile(file)
+		if err != nil {
+			return nil, errs.Wrapf(err, "failed to read hosts file %s", file.File)
+		}
+
+		for name, host := range c {
+			config[name] = host
+		}
+	}
+
+	return config, nil
 }
 
 func readHostsFile(file *hostsFile) (hostConfig, error) {

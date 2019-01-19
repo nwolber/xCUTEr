@@ -106,7 +106,7 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	}
 
 	if c.HostsFile != nil {
-		hosts, err := readHostsFile(c.HostsFile)
+		hosts, err := readHostsFiles(c.HostsFile)
 		if err != nil {
 			return nil, errs.Wrap(err, "failed to read hosts file")
 		}
