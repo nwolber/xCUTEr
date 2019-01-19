@@ -188,3 +188,72 @@ func TestRemoveLineComments(t *testing.T) {
 		})
 	}
 }
+
+func Test_hostsFileOrArray_MarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		f       hostsFileOrArray
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "no element",
+			f:    hostsFileOrArray{},
+			want: `null`,
+		},
+		{
+			name: "one element",
+			f:    hostsFileOrArray{&hostsFile{}},
+			want: `{}`,
+		},
+		{
+			name: "two elements",
+			f:    hostsFileOrArray{&hostsFile{}, &hostsFile{}},
+			want: `[{},{}]`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.f.MarshalJSON()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("hostsFileOrArray.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if s := string(got); s != tt.want {
+				t.Errorf("hostsFileOrArray.MarshalJSON() = '%v', want '%v'", s, tt.want)
+			}
+		})
+	}
+}
+
+func Test_hostsFileOrArray_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		f       hostsFileOrArray
+		input   string
+		wantErr bool
+	}{
+		{
+			name:  "no element",
+			f:     nil,
+			input: `null`,
+		},
+		{
+			name:  "one element",
+			f:     hostsFileOrArray{{}},
+			input: `{}`,
+		},
+		{
+			name:  "no element",
+			f:     hostsFileOrArray{{}, {}},
+			input: `[{},{}]`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.f.UnmarshalJSON([]byte(tt.input)); (err != nil) != tt.wantErr {
+				t.Errorf("hostsFileOrArray.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
