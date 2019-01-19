@@ -98,7 +98,7 @@ func VisitConfig(builder ConfigBuilder, c *Config) (interface{}, error) {
 	if c.Host != nil {
 		host, err := visitHost(builder, c, c.Host)
 		if err != nil {
-			return nil, errs.Wrapf(err, "failed to visit host", c.Host)
+			return nil, errs.Wrapf(err, "failed to visit host %s", c.Host)
 		}
 		host.Append(cmd)
 		// Prevent errors from bubbling up and release resources, as soon as the host is done.
